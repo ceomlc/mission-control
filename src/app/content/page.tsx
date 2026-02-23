@@ -10,6 +10,7 @@ interface ContentItem {
   status: string;
   hook: string;
   type: string;
+  project?: string;
 }
 
 export default function ContentPage() {
