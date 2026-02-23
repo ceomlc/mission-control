@@ -62,3 +62,23 @@ body {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
+
+/* Virtual Office ambient animations */
+@keyframes rise {
+  0% { opacity: 0.4; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-20px); }
+}
+
+@keyframes flicker {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.25; }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.5); }
+}
+
+.animate-fade-out {
+  animation: fadeOut 0.5s ease-out forwards;
+}
