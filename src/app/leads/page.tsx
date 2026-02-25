@@ -10,11 +10,13 @@ interface Lead {
   state: string;
   industry: string;
   has_website: boolean;
+  website_url: string;
   google_rating: number;
+  review_count: number;
   status: string;
   message_drafted: string;
-  message_sent_date: string;
-  response_received: boolean;
+  source: string;
+  notes: string;
   created_at: string;
 }
 
@@ -87,21 +89,21 @@ Would you be interested in learning more?`;
 
   return (
     <div className="min-h-screen bg-[#0A0A0F] p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-white">Lead Generation</h1>
+      <div className="max-w-full mx-auto">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold text-white">Lead Generation</h1>
           <div className="text-sm text-gray-500">
-            Total: {leads.length} leads
+            {leads.length} total leads
           </div>
         </div>
 
         {/* Status Filter Tabs */}
-        <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+        <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
           {Object.entries(statusCounts).map(([status, count]) => (
             <button
               key={status}
               onClick={() => setFilter(status)}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition ${
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${
                 filter === status 
                   ? 'bg-[#22d3ee] text-black' 
                   : 'bg-[#1A1A2E] text-gray-400 hover:bg-[#2A2A3E]'
@@ -112,43 +114,72 @@ Would you be interested in learning more?`;
           ))}
         </div>
 
-        {/* Leads Grid */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredLeads.map((lead) => (
-            <div 
-              key={lead.id}
-              className="bg-[#1A1A2E] rounded-xl border border-[#2A2A3E] p-5 hover:border-[#22d3ee]/50 transition"
-            >
-              <div className="flex justify-between items-start mb-3">
-                <h3 className="font-semibold text-lg text-white">{lead.company_name}</h3>
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[lead.status] || 'bg-gray-700'}`}>
-                  {lead.status}
-                </span>
-              </div>
-              
-              <div className="space-y-2 text-sm text-gray-400 mb-4">
-                <p>📍 {lead.city}, {lead.state}</p>
-                <p>🏭 {lead.industry}</p>
-                <p>📱 {lead.phone}</p>
-                <p>🌐 {lead.has_website ? 'Has Website' : 'No Website'}</p>
-                {lead.google_rating && <p>⭐ {lead.google_rating} rating</p>}
-              </div>
-
-              {lead.status === 'new' && (
-                <button
-                  onClick={() => setSelectedLead(lead)}
-                  className="w-full py-2 px-4 bg-[#22d3ee] text-black rounded-lg hover:bg-[#06b6d4] font-medium transition"
-                >
-                  Preview Message
-                </button>
-              )}
-            </div>
-          ))}
+        {/* Spreadsheet Layout */}
+        <div className="bg-[#1A1A2E] rounded-xl border border-[#2A2A3E] overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-[#0A0A0F] text-gray-400 text-left">
+                <tr>
+                  <th className="px-4 py-3 font-medium border-b border-[#2A2A3E]">Company</th>
+                  <th className="px-4 py-3 font-medium border-b border-[#2A2A3E]">Phone</th>
+                  <th className="px-4 py-3 font-medium border-b border-[#2A2A3E]">City</th>
+                  <th className="px-4 py-3 font-medium border-b border-[#2A2A3E]">Industry</th>
+                  <th className="px-4 py-3 font-medium border-b border-[#2A2A3E]">Website</th>
+                  <th className="px-4 py-3 font-medium border-b border-[#2A2A3E]">Rating</th>
+                  <th className="px-4 py-3 font-medium border-b border-[#2A2A3E]">Source</th>
+                  <th className="px-4 py-3 font-medium border-b border-[#2A2A3E]">Status</th>
+                  <th className="px-4 py-3 font-medium border-b border-[#2A2A3E]">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="text-gray-300">
+                {filteredLeads.map((lead) => (
+                  <tr key={lead.id} className="border-b border-[#2A2A3E] hover:bg-[#2A2A3E]/50">
+                    <td className="px-4 py-3 font-medium text-white">{lead.company_name}</td>
+                    <td className="px-4 py-3 font-mono">{lead.phone}</td>
+                    <td className="px-4 py-3">{lead.city}, {lead.state}</td>
+                    <td className="px-4 py-3">{lead.industry}</td>
+                    <td className="px-4 py-3">
+                      {lead.website_url ? (
+                        <a href={lead.website_url} target="_blank" rel="noopener noreferrer" className="text-[#22d3ee] hover:underline">
+                          Visit →
+                        </a>
+                      ) : (
+                        <span className="text-red-400">None</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {lead.google_rating ? (
+                        <span className="text-yellow-400">⭐ {lead.google_rating}</span>
+                      ) : (
+                        <span className="text-gray-500">-</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-gray-500 text-xs">{lead.source}</td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[lead.status] || 'bg-gray-700'}`}>
+                        {lead.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {lead.status === 'new' && (
+                        <button
+                          onClick={() => setSelectedLead(lead)}
+                          className="px-3 py-1 bg-[#22d3ee] text-black text-xs rounded hover:bg-[#06b6d4]"
+                        >
+                          Preview
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {filteredLeads.length === 0 && (
           <div className="text-center py-12 text-gray-500">
-            No leads found with this status.
+            No leads found.
           </div>
         )}
       </div>
@@ -159,9 +190,20 @@ Would you be interested in learning more?`;
           <div className="bg-[#1A1A2E] rounded-2xl max-w-lg w-full p-6 border border-[#2A2A3E]">
             <h2 className="text-xl font-bold mb-4 text-white">{selectedLead.company_name}</h2>
             
+            <div className="space-y-3 mb-4 text-sm">
+              <div className="grid grid-cols-2 gap-2">
+                <div><span className="text-gray-500">Phone:</span> <span className="text-white font-mono">{selectedLead.phone}</span></div>
+                <div><span className="text-gray-500">Location:</span> <span className="text-white">{selectedLead.city}, {selectedLead.state}</span></div>
+                <div><span className="text-gray-500">Industry:</span> <span className="text-white">{selectedLead.industry}</span></div>
+                <div><span className="text-gray-500">Rating:</span> <span className="text-yellow-400">{selectedLead.google_rating || '-'} ⭐</span></div>
+                <div><span className="text-gray-500">Source:</span> <span className="text-white">{selectedLead.source}</span></div>
+                <div><span className="text-gray-500">Website:</span> <span className="text-white">{selectedLead.website_url || 'None'}</span></div>
+              </div>
+            </div>
+
             <div className="bg-[#0A0A0F] rounded-lg p-4 mb-4 border border-[#2A2A3E]">
               <p className="text-sm text-gray-500 mb-2">Message Preview:</p>
-              <p className="text-gray-200 whitespace-pre-wrap">{generateMessage(selectedLead)}</p>
+              <p className="text-gray-200 whitespace-pre-wrap text-sm">{generateMessage(selectedLead)}</p>
             </div>
 
             <div className="flex gap-3">
