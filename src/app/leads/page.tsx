@@ -19,12 +19,12 @@ interface Lead {
 }
 
 const statusColors: Record<string, string> = {
-  new: 'bg-gray-100 text-gray-800',
-  researched: 'bg-blue-100 text-blue-800',
-  drafted: 'bg-yellow-100 text-yellow-800',
-  sent: 'bg-green-100 text-green-800',
-  responded: 'bg-purple-100 text-purple-800',
-  dead: 'bg-red-100 text-red-800',
+  new: 'bg-gray-700 text-gray-300',
+  researched: 'bg-blue-900 text-blue-300',
+  drafted: 'bg-yellow-900 text-yellow-300',
+  sent: 'bg-green-900 text-green-300',
+  responded: 'bg-purple-900 text-purple-300',
+  dead: 'bg-red-900 text-red-300',
 };
 
 export default function LeadsPage() {
@@ -74,7 +74,6 @@ Would you be interested in learning more?`;
 
   const handleApprove = async (lead: Lead) => {
     const message = generateMessage(lead);
-    // Update status to drafted
     await fetch(`/api/leads`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -84,13 +83,13 @@ Would you be interested in learning more?`;
     setSelectedLead(null);
   };
 
-  if (loading) return <div className="p-8 text-center">Loading leads...</div>;
+  if (loading) return <div className="p-8 text-center text-gray-400">Loading leads...</div>;
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-[#0A0A0F] p-6">
       <div className="max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Lead Generation</h1>
+          <h1 className="text-3xl font-bold text-white">Lead Generation</h1>
           <div className="text-sm text-gray-500">
             Total: {leads.length} leads
           </div>
@@ -104,8 +103,8 @@ Would you be interested in learning more?`;
               onClick={() => setFilter(status)}
               className={`px-4 py-2 rounded-full text-sm font-medium transition ${
                 filter === status 
-                  ? 'bg-gray-900 text-white' 
-                  : 'bg-white text-gray-700 hover:bg-gray-100'
+                  ? 'bg-[#22d3ee] text-black' 
+                  : 'bg-[#1A1A2E] text-gray-400 hover:bg-[#2A2A3E]'
               }`}
             >
               {status.charAt(0).toUpperCase() + status.slice(1)} ({count})
@@ -118,16 +117,16 @@ Would you be interested in learning more?`;
           {filteredLeads.map((lead) => (
             <div 
               key={lead.id}
-              className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition"
+              className="bg-[#1A1A2E] rounded-xl border border-[#2A2A3E] p-5 hover:border-[#22d3ee]/50 transition"
             >
               <div className="flex justify-between items-start mb-3">
-                <h3 className="font-semibold text-lg text-gray-900">{lead.company_name}</h3>
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[lead.status] || 'bg-gray-100'}`}>
+                <h3 className="font-semibold text-lg text-white">{lead.company_name}</h3>
+                <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[lead.status] || 'bg-gray-700'}`}>
                   {lead.status}
                 </span>
               </div>
               
-              <div className="space-y-2 text-sm text-gray-600 mb-4">
+              <div className="space-y-2 text-sm text-gray-400 mb-4">
                 <p>📍 {lead.city}, {lead.state}</p>
                 <p>🏭 {lead.industry}</p>
                 <p>📱 {lead.phone}</p>
@@ -138,7 +137,7 @@ Would you be interested in learning more?`;
               {lead.status === 'new' && (
                 <button
                   onClick={() => setSelectedLead(lead)}
-                  className="w-full py-2 px-4 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition"
+                  className="w-full py-2 px-4 bg-[#22d3ee] text-black rounded-lg hover:bg-[#06b6d4] font-medium transition"
                 >
                   Preview Message
                 </button>
@@ -156,25 +155,25 @@ Would you be interested in learning more?`;
 
       {/* Message Preview Modal */}
       {selectedLead && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6">
-            <h2 className="text-xl font-bold mb-4">{selectedLead.company_name}</h2>
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+          <div className="bg-[#1A1A2E] rounded-2xl max-w-lg w-full p-6 border border-[#2A2A3E]">
+            <h2 className="text-xl font-bold mb-4 text-white">{selectedLead.company_name}</h2>
             
-            <div className="bg-gray-50 rounded-lg p-4 mb-4">
+            <div className="bg-[#0A0A0F] rounded-lg p-4 mb-4 border border-[#2A2A3E]">
               <p className="text-sm text-gray-500 mb-2">Message Preview:</p>
-              <p className="text-gray-800 whitespace-pre-wrap">{generateMessage(selectedLead)}</p>
+              <p className="text-gray-200 whitespace-pre-wrap">{generateMessage(selectedLead)}</p>
             </div>
 
             <div className="flex gap-3">
               <button
                 onClick={() => setSelectedLead(null)}
-                className="flex-1 py-2 px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                className="flex-1 py-2 px-4 border border-[#2A2A3E] text-gray-400 rounded-lg hover:bg-[#2A2A3E]"
               >
                 Cancel
               </button>
               <button
                 onClick={() => handleApprove(selectedLead)}
-                className="flex-1 py-2 px-4 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                className="flex-1 py-2 px-4 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
               >
                 Approve & Send
               </button>
