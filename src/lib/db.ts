@@ -6,6 +6,7 @@ const pool = new Pool({
   database: 'leads_production',
   user: 'athena',
   password: 'AthenaPass2026!',
+  ssl: { rejectUnauthorized: false },
 });
 
 export default pool;
