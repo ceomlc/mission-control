@@ -51,6 +51,40 @@ export default function LeadsPage() {
     }
   };
 
+  // Curiosity gap message generator
+  const hooks = {
+    HVAC: [
+      "There's a reason some HVAC companies never run out of calls...",
+      "Most HVAC companies in Baltimore are missing this while they sleep...",
+      "What if you could double your calls without spending another dollar on ads?",
+      "The hidden reason your competitors show up first on Google",
+    ],
+    Plumbing: [
+      "The #1 thing homeowners Google before calling a plumber...",
+      "Why are some plumbers booked out 3 weeks while others scramble?",
+      "Most plumbing companies are losing 30% of leads because of this...",
+    ],
+    Roofing: [
+      "Storm season is coming — is your roof ready to be found?",
+      "The secret weapon top roofing companies use to get more calls...",
+      "What Baltimore homeowners are searching for right now that you're missing",
+    ]
+  };
+
+  const closers = [
+    "Reply YES for a quick audit — no commitment.",
+    "Curious? Text YES for details.",
+  ];
+
+  const generateMessage = (lead: Lead) => {
+    const industryHooks = hooks[lead.industry as keyof typeof hooks] || hooks['HVAC'];
+    const hook = industryHooks[Math.floor(Math.random() * industryHooks.length)];
+    const closer = closers[Math.floor(Math.random() * closers.length)];
+    const city = lead.city || 'Baltimore';
+    
+    return `${lead.industry} companies in ${city}: ${hook} ${closer}`;
+  };
+
   const filteredLeads = filter === 'all' 
     ? leads 
     : leads.filter(l => l.status === filter);
