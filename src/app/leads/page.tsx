@@ -99,13 +99,30 @@ export default function LeadsPage() {
 
   const statusCounts = getStatusCounts();
 
-  const generateMessage = (lead: Lead) => {
-    const businessName = lead.company_name;
-    const trade = lead.industry?.toLowerCase() || 'home service';
-    
-    return `Hi! I noticed ${businessName} is serving the ${lead.city || 'local'} area. We help ${trade} businesses get more calls with a professional website - just $97/mo with free updates anytime you need changes.
+  // Curiosity gap message generator
+  const templates = {
+    HVAC: [
+      "Quick question for you... Most HVAC companies in {city} are losing 30% of leads to competitors with better websites. What's the #1 thing holding you back from updating yours?",
+      "Hey {first_name}, there's a reason some HVAC companies never run out of calls... What's yours?",
+      "{first_name} - what if you could double your calls without spending another dollar on ads?"
+    ],
+    Plumbing: [
+      "Quick question... Most plumbing companies in {city} are losing 30% of leads because of this. What's your biggest challenge?",
+      "Hey {first_name}, why are some plumbers booked out 3 weeks while others scramble?"
+    ],
+    Roofing: [
+      "Quick question for you... Storm season is coming - is your roof ready to be found?",
+      "Hey {first_name}, the secret weapon top roofing companies use to get more calls... want to know what it is?"
+    ]
+  };
 
-Would you be interested in learning more?`;
+  const generateMessage = (lead: Lead) => {
+    const firstName = lead.company_name.split(' ')[0];
+    const city = lead.city || 'Baltimore';
+    const industryTemplates = templates[lead.industry as keyof typeof templates] || templates['HVAC'];
+    const template = industryTemplates[Math.floor(Math.random() * industryTemplates.length)];
+    const message = template.replace('{first_name}', firstName).replace('{city}', city);
+    return message + ' Reply YES for details. - Jaivien';
   };
 
   const handleApprove = async (lead: Lead) => {
@@ -117,6 +134,18 @@ Would you be interested in learning more?`;
     });
     fetchLeads();
     setSelectedLead(null);
+  };
+
+  const handleSend = async (lead: Lead) => {
+    // Mark as sent - in production, this would trigger Clawd Cursor to send via StraightText
+    await fetch(`/api/leads`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: lead.id, status: 'sent', message_sent_date: new Date().toISOString() }),
+    });
+    fetchLeads();
+    setSelectedLead(null);
+    alert('SMS sent! (Demo - would trigger Clawd Cursor in production)');
   };
 
   if (loading) return <div className="p-8 text-center text-gray-400">Loading leads...</div>;
@@ -198,9 +227,17 @@ Would you be interested in learning more?`;
                       {lead.status === 'new' && (
                         <button
                           onClick={() => setSelectedLead(lead)}
-                          className="px-3 py-1 bg-[#22d3ee] text-black text-xs rounded hover:bg-[#06b6d4]"
+                          className="px-3 py-1 bg-[#22d3ee] text-black text-xs rounded hover:bg-[#06b6d4] mr-2"
                         >
                           Preview
+                        </button>
+                      )}
+                      {lead.status === 'drafted' && (
+                        <button
+                          onClick={() => setSelectedLead(lead)}
+                          className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-500"
+                        >
+                          View & Send
                         </button>
                       )}
                     </td>
@@ -237,7 +274,9 @@ Would you be interested in learning more?`;
 
             <div className="bg-[#0A0A0F] rounded-lg p-4 mb-4 border border-[#2A2A3E]">
               <p className="text-sm text-gray-500 mb-2">Message Preview:</p>
-              <p className="text-gray-200 whitespace-pre-wrap text-sm">{generateMessage(selectedLead)}</p>
+              <p className="text-gray-200 whitespace-pre-wrap text-sm">
+                {selectedLead.message_drafted || generateMessage(selectedLead)}
+              </p>
             </div>
 
             <div className="flex gap-3">
@@ -247,12 +286,21 @@ Would you be interested in learning more?`;
               >
                 Cancel
               </button>
-              <button
-                onClick={() => handleApprove(selectedLead)}
-                className="flex-1 py-2 px-4 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
-              >
-                Approve & Send
-              </button>
+              {selectedLead.status === 'new' ? (
+                <button
+                  onClick={() => handleApprove(selectedLead)}
+                  className="flex-1 py-2 px-4 bg-[#22d3ee] text-black rounded-lg hover:bg-[#06b6d4] font-medium"
+                >
+                  Generate Message
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleSend(selectedLead)}
+                  className="flex-1 py-2 px-4 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
+                >
+                  Send SMS
+                </button>
+              )}
             </div>
           </div>
         </div>
