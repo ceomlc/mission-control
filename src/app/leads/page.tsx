@@ -34,6 +34,7 @@ export default function LeadsPage() {
   const [loading, setLoading] = useState(true);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [filter, setFilter] = useState<string>('all');
+  const [researching, setResearching] = useState(false);
 
   useEffect(() => {
     fetchLeads();
@@ -49,40 +50,6 @@ export default function LeadsPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  // Curiosity gap message generator
-  const hooks = {
-    HVAC: [
-      "There's a reason some HVAC companies never run out of calls...",
-      "Most HVAC companies in Baltimore are missing this while they sleep...",
-      "What if you could double your calls without spending another dollar on ads?",
-      "The hidden reason your competitors show up first on Google",
-    ],
-    Plumbing: [
-      "The #1 thing homeowners Google before calling a plumber...",
-      "Why are some plumbers booked out 3 weeks while others scramble?",
-      "Most plumbing companies are losing 30% of leads because of this...",
-    ],
-    Roofing: [
-      "Storm season is coming — is your roof ready to be found?",
-      "The secret weapon top roofing companies use to get more calls...",
-      "What Baltimore homeowners are searching for right now that you're missing",
-    ]
-  };
-
-  const closers = [
-    "Reply YES for a quick audit — no commitment.",
-    "Curious? Text YES for details.",
-  ];
-
-  const generateMessage = (lead: Lead) => {
-    const industryHooks = hooks[lead.industry as keyof typeof hooks] || hooks['HVAC'];
-    const hook = industryHooks[Math.floor(Math.random() * industryHooks.length)];
-    const closer = closers[Math.floor(Math.random() * closers.length)];
-    const city = lead.city || 'Baltimore';
-    
-    return `${lead.industry} companies in ${city}: ${hook} ${closer}`;
   };
 
   const filteredLeads = filter === 'all' 
@@ -136,6 +103,24 @@ export default function LeadsPage() {
     setSelectedLead(null);
   };
 
+  const handleResearch = async () => {
+    setResearching(true);
+    try {
+      const res = await fetch('/api/leads/research', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ limit: 10 }),
+      });
+      const data = await res.json();
+      alert(`Research complete! Added ${data.added} new leads.`);
+      fetchLeads();
+    } catch (error) {
+      alert('Research failed: ' + error);
+    } finally {
+      setResearching(false);
+    }
+  };
+
   const handleSend = async (lead: Lead) => {
     // Mark as sent - in production, this would trigger Clawd Cursor to send via StraightText
     await fetch(`/api/leads`, {
@@ -155,6 +140,13 @@ export default function LeadsPage() {
       <div className="max-w-full mx-auto">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold text-white">Lead Generation</h1>
+          <button
+            onClick={handleResearch}
+            disabled={researching}
+            className="px-4 py-2 bg-[#22d3ee] text-black rounded-lg hover:bg-[#06b6d4] font-medium disabled:opacity-50"
+          >
+            {researching ? 'Researching...' : 'Research New Leads'}
+          </button>
           <div className="text-sm text-gray-500">
             {leads.length} total leads
           </div>
