@@ -35,6 +35,7 @@ export default function LeadsPage() {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [filter, setFilter] = useState<string>('all');
   const [researching, setResearching] = useState(false);
+  const [generatingAll, setGeneratingAll] = useState(false);
 
   useEffect(() => {
     fetchLeads();
@@ -121,6 +122,21 @@ export default function LeadsPage() {
     }
   };
 
+  const handleGenerateAll = async () => {
+    if (!confirm('Generate curiosity-gap messages for ALL researched leads?')) return;
+    setGeneratingAll(true);
+    try {
+      const res = await fetch('/api/leads/generate-all', { method: 'POST' });
+      const data = await res.json();
+      alert(`Generated messages for ${data.generated} leads!`);
+      fetchLeads();
+    } catch (error) {
+      alert('Generation failed: ' + error);
+    } finally {
+      setGeneratingAll(false);
+    }
+  };
+
   const handleSend = async (lead: Lead) => {
     // Mark as sent - in production, this would trigger Clawd Cursor to send via StraightText
     await fetch(`/api/leads`, {
@@ -146,6 +162,13 @@ export default function LeadsPage() {
             className="px-4 py-2 bg-[#22d3ee] text-black rounded-lg hover:bg-[#06b6d4] font-medium disabled:opacity-50"
           >
             {researching ? 'Researching...' : 'Research New Leads'}
+          </button>
+          <button
+            onClick={handleGenerateAll}
+            disabled={generatingAll}
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium disabled:opacity-50"
+          >
+            {generatingAll ? 'Generating...' : 'Generate All Messages'}
           </button>
           <div className="text-sm text-gray-500">
             {leads.length} total leads
