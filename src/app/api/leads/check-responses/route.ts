@@ -5,22 +5,55 @@ import { promisify } from 'util';
 
 const execAsync = promisify(exec);
 
+// Keywords that indicate interest in getting a website
+const INTEREST_KEYWORDS = [
+  'yes', 'interested', 'tell me more', 'more info', 'how much', 
+  'pricing', 'cost', 'quote', 'can you', 'please', 'sure', 
+  'ok', 'okay', 'sounds good', 'lets do', 'start', 'build',
+  'website', 'web design', 'design', 'marketing'
+];
+
+// Keywords that indicate NOT interested (stop the workflow)
+const DISINTEREST_KEYWORDS = [
+  'no thanks', 'not interested', 'don\'t want', 'not looking',
+  'stop', 'remove', 'unsubscribe', 'leave me alone'
+];
+
+function detectInterest(messageText: string): 'interested' | 'not_interested' | 'neutral' {
+  if (!messageText) return 'neutral';
+  
+  const lower = messageText.toLowerCase();
+  
+  // Check for disinterest first
+  for (const keyword of DISINTEREST_KEYWORDS) {
+    if (lower.includes(keyword)) return 'not_interested';
+  }
+  
+  // Check for interest
+  for (const keyword of INTEREST_KEYWORDS) {
+    if (lower.includes(keyword)) return 'interested';
+  }
+  
+  return 'neutral';
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { limit = 50 } = body;
+    const { limit = 50, autoBuild = true } = body;
 
     // Get drafted leads (the ones we're sending)
     const result = await pool.query(
-      "SELECT id, company_name, phone FROM leads WHERE status = 'drafted' AND phone IS NOT NULL AND phone != '' LIMIT $1",
+      "SELECT id, company_name, phone, website, google_rating FROM leads WHERE status = 'drafted' AND phone IS NOT NULL AND phone != '' LIMIT $1",
       [limit]
     );
 
     if (result.rows.length === 0) {
-      return NextResponse.json({ checked: 0, responses: [] });
+      return NextResponse.json({ checked: 0, responses: [], buildsTriggered: [] });
     }
 
     const responses: any[] = [];
+    const buildsTriggered: any[] = [];
 
     // Check each number in iMessage
     for (const lead of result.rows) {
@@ -28,7 +61,7 @@ export async function POST(request: Request) {
       if (!phone) continue;
 
       try {
-        // Search for messages from this number - check both directions
+        // Search for messages from this number
         const { stdout } = await execAsync(`imsg chats --json 2>/dev/null | grep -i "${phone}" || echo ""`);
         
         if (stdout.trim()) {
@@ -44,22 +77,87 @@ export async function POST(request: Request) {
               const history = JSON.parse(historyOut);
               const lastMsg = history[0];
               
-              // Check if last message is FROM them (not us) - meaning they responded
-              // Or if there's a recent message that's not from us
+              // Check if last message is FROM them (not us)
               if (lastMsg && !lastMsg.isFromMe) {
+                const interest = detectInterest(lastMsg.text);
+                
                 responses.push({
                   leadId: lead.id,
                   company: lead.company_name,
                   phone: lead.phone,
                   lastMessage: lastMsg.text,
-                  respondedAt: lastMsg.date
+                  respondedAt: lastMsg.date,
+                  interest
                 });
-                
-                // Update status to responded
-                await pool.query(
-                  "UPDATE leads SET status = 'responded', updated_at = NOW() WHERE id = $1",
-                  [lead.id]
-                );
+
+                // Update status based on interest
+                if (interest === 'interested') {
+                  await pool.query(
+                    "UPDATE leads SET status = 'interested', updated_at = NOW() WHERE id = $1",
+                    [lead.id]
+                  );
+                  
+                  // AUTO-TRIGGER BUILD WORKFLOW
+                  if (autoBuild && lead.website) {
+                    try {
+                      // Extract brand
+                      const brandRes = await fetch('http://localhost:3000/api/projects/extract-brand', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          client: lead.company_name,
+                          url: lead.website,
+                          city: lead.city || '',
+                          state: lead.state || 'MD'
+                        })
+                      });
+                      const brandData = await brandRes.json();
+                      
+                      if (brandData.success) {
+                        // Generate SPEC.md
+                        const specRes = await fetch('http://localhost:3000/api/projects/spec', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            clientName: brandData.brand.clientName,
+                            slug: brandData.brand.slug,
+                            websiteUrl: brandData.brand.websiteUrl,
+                            industry: brandData.brand.industry,
+                            city: brandData.brand.city,
+                            state: brandData.brand.state,
+                            services: brandData.brand.services,
+                            tagline: brandData.brand.tagline,
+                            targetAudience: brandData.brand.targetAudience,
+                            designPreferences: brandData.brand.designPreferences,
+                            contact: brandData.brand.contact
+                          })
+                        });
+                        const specData = await specRes.json();
+                        
+                        buildsTriggered.push({
+                          leadId: lead.id,
+                          company: lead.company_name,
+                          brandExtracted: true,
+                          specGenerated: specData.success,
+                          slug: brandData.brand.slug
+                        });
+                      }
+                    } catch (buildError) {
+                      console.error('Auto-build trigger failed:', buildError);
+                    }
+                  }
+                } else if (interest === 'not_interested') {
+                  await pool.query(
+                    "UPDATE leads SET status = 'not_interested', updated_at = NOW() WHERE id = $1",
+                    [lead.id]
+                  );
+                } else {
+                  // Just responded but neutral
+                  await pool.query(
+                    "UPDATE leads SET status = 'responded', updated_at = NOW() WHERE id = $1",
+                    [lead.id]
+                  );
+                }
               }
             }
           }
@@ -73,7 +171,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ 
       checked: result.rows.length,
       responses,
-      respondedCount: responses.length
+      respondedCount: responses.filter(r => r.interest !== 'not_interested').length,
+      interestedCount: responses.filter(r => r.interest === 'interested').length,
+      buildsTriggered
     });
 
   } catch (error: any) {
