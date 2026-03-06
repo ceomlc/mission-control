@@ -36,6 +36,8 @@ export default function LeadsPage() {
   const [filter, setFilter] = useState<string>('all');
   const [researching, setResearching] = useState(false);
   const [generatingAll, setGeneratingAll] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [checkingResponses, setCheckingResponses] = useState(false);
 
   useEffect(() => {
     fetchLeads();
@@ -137,6 +139,50 @@ export default function LeadsPage() {
     }
   };
 
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const res = await fetch('/api/leads/export', { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ limit: 25 }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(`Exported ${data.exported} leads to Desktop: ${data.filename}`);
+      } else {
+        alert(data.error || 'Export failed');
+      }
+      fetchLeads();
+    } catch (error) {
+      alert('Export failed: ' + error);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleCheckResponses = async () => {
+    setCheckingResponses(true);
+    try {
+      const res = await fetch('/api/leads/check-responses', { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ limit: 50 }),
+      });
+      const data = await res.json();
+      if (data.respondedCount > 0) {
+        alert(`Found ${data.respondedCount} responses!\n\n${data.responses.map((r: any) => `${r.company}: ${r.lastMessage?.substring(0, 50)}...`).join('\n')}`);
+      } else {
+        alert(`Checked ${data.checked} leads. No responses yet.`);
+      }
+      fetchLeads();
+    } catch (error) {
+      alert('Check failed: ' + error);
+    } finally {
+      setCheckingResponses(false);
+    }
+  };
+
   const handleSend = async (lead: Lead) => {
     // Mark as sent - in production, this would trigger Clawd Cursor to send via StraightText
     await fetch(`/api/leads`, {
@@ -169,6 +215,20 @@ export default function LeadsPage() {
             className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium disabled:opacity-50"
           >
             {generatingAll ? 'Generating...' : 'Generate All Messages'}
+          </button>
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:opacity-50"
+          >
+            {exporting ? 'Exporting...' : 'Export 25 to CSV'}
+          </button>
+          <button
+            onClick={handleCheckResponses}
+            disabled={checkingResponses}
+            className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 font-medium disabled:opacity-50"
+          >
+            {checkingResponses ? 'Checking...' : 'Check Responses'}
           </button>
           <div className="text-sm text-gray-500">
             {leads.length} total leads
