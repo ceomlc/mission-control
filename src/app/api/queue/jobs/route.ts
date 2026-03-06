@@ -94,11 +94,34 @@ export async function POST(request: Request) {
       if (!jobId) {
         return NextResponse.json({ error: 'jobId is required' }, { status: 400 });
       }
+
+      // Get job details for deployment
+      const jobResult = await pool.query('SELECT * FROM build_jobs WHERE id = $1', [jobId]);
+      const job = jobResult.rows[0];
+
+      // Trigger automated deployment
+      let deployResult = null;
+      try {
+        const deployRes = await fetch('http://localhost:3000/api/deploy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ slug: job.client_slug })
+        });
+        deployResult = await deployRes.json();
+      } catch (e) {
+        console.error('Auto-deploy failed:', e);
+      }
+
+      // Mark job as completed
       await pool.query(
         `UPDATE build_jobs SET status = 'completed', deployed_url = $1, completed_at = NOW() WHERE id = $2`,
-        [deployedUrl || '', jobId]
+        [deployResult?.deployUrl || '', jobId]
       );
-      return NextResponse.json({ success: true, message: 'Job completed' });
+      return NextResponse.json({ 
+        success: true, 
+        message: 'Job completed',
+        deployment: deployResult
+      });
     }
 
     // Fail job
