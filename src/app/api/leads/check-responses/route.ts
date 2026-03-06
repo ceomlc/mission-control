@@ -44,7 +44,7 @@ export async function POST(request: Request) {
 
     // Get drafted leads (the ones we're sending)
     const result = await pool.query(
-      "SELECT id, company_name, phone, website, google_rating FROM leads WHERE status = 'drafted' AND phone IS NOT NULL AND phone != '' LIMIT $1",
+      "SELECT id, company_name, phone, website_url, google_rating FROM leads WHERE status = 'drafted' AND phone IS NOT NULL AND phone != '' LIMIT $1",
       [limit]
     );
 
@@ -98,7 +98,7 @@ export async function POST(request: Request) {
                   );
                   
                   // AUTO-TRIGGER BUILD WORKFLOW
-                  if (autoBuild && lead.website) {
+                  if (autoBuild && lead.website_url) {
                     try {
                       // Extract brand
                       const brandRes = await fetch('http://localhost:3000/api/projects/extract-brand', {
