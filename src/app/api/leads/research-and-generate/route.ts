@@ -4,6 +4,41 @@ import pool from '@/lib/db';
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 
 const TRADES = ['HVAC', 'Plumbing', 'Roofing'];
+
+// Scrape website for owner name
+async function findOwnerName(websiteUrl: string): Promise<string | null> {
+  if (!websiteUrl) return null;
+  
+  try {
+    const response = await fetch(websiteUrl, { 
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AthenaBot/1.0)' },
+      signal: AbortSignal.timeout(8000)
+    });
+    const html = await response.text();
+    
+    // Look for common patterns
+    const patterns = [
+      /owner[:\s]+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i,
+      /founded\s+by[:\s]+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i,
+      /meet\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)[\s,]*(?:owner|founder|founder|president)/i,
+      /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s*[-–]\s*(?:owner|founder|president|ceo)/i,
+      /<h[1-6][^>]*>(?:Our\s+)?(?:Team|About\s+Us|Meet\s+Us)<\/h/i,
+    ];
+    
+    for (const pattern of patterns) {
+      const match = html.match(pattern);
+      if (match && match[1]) return match[1].trim();
+    }
+    
+    // Try meta tags
+    const authorMatch = html.match(/<meta[^>]*name=["']author["'][^>]*content=["']([^"']+)["']/i);
+    if (authorMatch && authorMatch[1]) return authorMatch[1].split(' ')[0];
+    
+  } catch (e) {
+    // Silently fail - owner name is optional
+  }
+  return null;
+}
 const CITIES = [
   'Baltimore', 'Towson', 'Columbia', 'Silver Spring', 'Annapolis',
   'Washington DC', 'Alexandria', 'Arlington', 'Bethesda', 'Rockville',
@@ -12,7 +47,7 @@ const CITIES = [
 ];
 
 function generateMessage(lead: any): string {
-  const firstName = lead.company_name?.split(' ')[0] || 'there';
+  const firstName = lead.first_name || lead.company_name?.split(' ')[0] || 'there';
   const city = lead.city || 'Baltimore';
   const industry = lead.industry || 'trade';
   const hasWebsite = lead.has_website;
@@ -70,8 +105,7 @@ export async function POST(request: Request) {
               google_rating: result.rating || null,
               review_count: result.user_ratings_total || 0,
               status: 'drafted', // Goes straight to drafted!
-              source: 'google_maps_automated',
-              notes: `Google Maps: ${result.formatted_address}`
+              source: 'google_maps_automated'
             });
           }
         } catch (e) {
@@ -92,13 +126,24 @@ export async function POST(request: Request) {
         // Generate message for this lead
         const message = generateMessage(lead);
         
+        // Try to find owner name from website
+        const firstName = await findOwnerName(lead.website_url);
+        
         const result = await pool.query(
-          `INSERT INTO leads (company_name, phone, city, state, industry, website_url, has_website, google_rating, review_count, status, source, notes, message_drafted)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+          `INSERT INTO leads (company_name, phone, city, state, industry, website_url, has_website, google_rating, review_count, status, source, message_drafted, researched_date)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
            ON CONFLICT DO NOTHING
            RETURNING id`,
-          [lead.company_name, lead.phone, lead.city, lead.state, lead.industry, lead.website_url, lead.has_website, lead.google_rating, lead.review_count, lead.status, lead.source, lead.notes, message]
+          [lead.company_name, lead.phone, lead.city, lead.state, lead.industry, lead.website_url, lead.has_website, lead.google_rating, lead.review_count, lead.status, lead.source, message]
         );
+        
+        // If lead was inserted and we found a first name, save it
+        if (result.rows.length > 0 && firstName) {
+          await pool.query(
+            'INSERT INTO lead_first_names (lead_id, first_name) VALUES ($1, $2)',
+            [result.rows[0].id, firstName]
+          );
+        }
         
         if (result.rows.length > 0) {
           added++;

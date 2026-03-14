@@ -8,9 +8,13 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { limit = 25 } = body;
 
-    // Get drafted leads (ready to send)
+    // Get drafted leads with first names
     const result = await pool.query(
-      "SELECT company_name, phone, message_drafted, city, industry, google_rating FROM leads WHERE status = 'drafted' AND phone IS NOT NULL AND phone != '' ORDER BY created_at DESC LIMIT $1",
+      `SELECT l.company_name, l.phone, l.message_drafted, l.city, l.industry, l.google_rating, fn.first_name 
+       FROM leads l 
+       LEFT JOIN lead_first_names fn ON l.id = fn.lead_id 
+       WHERE l.status = 'drafted' AND l.phone IS NOT NULL AND l.phone != '' 
+       ORDER BY l.created_at DESC LIMIT $1`,
       [limit]
     );
 
@@ -18,17 +22,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No drafted leads to export' }, { status: 400 });
     }
 
-    // Create CSV content
-    const csvHeader = 'firstName,lastName,phone,companyName,message\n';
+    // Create CSV content - firstName from research, company name in lastName, include city/state
+    const csvHeader = 'firstName,lastName,phone,companyName,city,state,message\n';
     const csvContent = csvHeader + result.rows.map(lead => {
-      const names = (lead.company_name || '').split(' ');
-      const firstName = names[0] || '';
-      const lastName = names.slice(1).join(' ') || '';
+      const firstName = lead.first_name || '';
+      const lastName = lead.company_name || '';
+      const city = lead.city || '';
+      const state = lead.state || '';
       // Clean phone - remove non-digits
       const phone = (lead.phone || '').replace(/\D/g, '');
       // Escape quotes in message
       const message = (lead.message_drafted || '').replace(/"/g, '""');
-      return `${firstName},${lastName},${phone},"${lead.company_name}","${message}"`;
+      return `${firstName},${lastName},${phone},"${lead.company_name}","${city}","${state}","${message}"`;
     }).join('\n');
 
     // Save to desktop

@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 interface Lead {
   id: number;
   company_name: string;
+  first_name?: string;
   phone: string;
   city: string;
   state: string;
@@ -15,6 +16,7 @@ interface Lead {
   review_count: number;
   status: string;
   message_drafted: string;
+  message_sent_date?: string;
   source: string;
   notes: string;
   created_at: string;
@@ -24,9 +26,12 @@ const statusColors: Record<string, string> = {
   new: 'bg-gray-700 text-gray-300',
   researched: 'bg-blue-900 text-blue-300',
   drafted: 'bg-yellow-900 text-yellow-300',
+  pending_approval: 'bg-orange-900 text-orange-300',
+  approved: 'bg-cyan-900 text-cyan-300',
   sent: 'bg-green-900 text-green-300',
+  failed: 'bg-red-900 text-red-300',
   responded: 'bg-purple-900 text-purple-300',
-  dead: 'bg-red-900 text-red-300',
+  dead: 'bg-gray-900 text-gray-500',
 };
 
 export default function LeadsPage() {
@@ -36,8 +41,9 @@ export default function LeadsPage() {
   const [filter, setFilter] = useState<string>('all');
   const [researching, setResearching] = useState(false);
   const [generatingAll, setGeneratingAll] = useState(false);
-  const [exporting, setExporting] = useState(false);
+  const [preparingSend, setPreparingSend] = useState(false);
   const [checkingResponses, setCheckingResponses] = useState(false);
+  const [sendingLeadId, setSendingLeadId] = useState<number | null>(null);
 
   useEffect(() => {
     fetchLeads();
@@ -58,6 +64,9 @@ export default function LeadsPage() {
   const filteredLeads = filter === 'all' 
     ? leads 
     : leads.filter(l => l.status === filter);
+
+  // Get leads for Outreach Queue (pending_approval status)
+  const outreachLeads = leads.filter(l => l.status === 'pending_approval');
 
   const getStatusCounts = () => {
     const counts: Record<string, number> = { all: leads.length };
@@ -87,7 +96,7 @@ export default function LeadsPage() {
   };
 
   const generateMessage = (lead: Lead) => {
-    const firstName = lead.company_name.split(' ')[0];
+    const firstName = lead.first_name || lead.company_name.split(' ')[0];
     const city = lead.city || 'Baltimore';
     const industryTemplates = templates[lead.industry as keyof typeof templates] || templates['HVAC'];
     const template = industryTemplates[Math.floor(Math.random() * industryTemplates.length)];
@@ -104,6 +113,62 @@ export default function LeadsPage() {
     });
     fetchLeads();
     setSelectedLead(null);
+  };
+
+  const handlePrepareSend = async () => {
+    setPreparingSend(true);
+    try {
+      const res = await fetch('/api/leads/prepare-send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ limit: 25 }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(`Moved ${data.leadsMoved} leads to Outreach Queue!\n\nRemaining today: ${data.remainingSlots}`);
+      } else {
+        alert(data.error || 'Failed to prepare leads');
+      }
+      fetchLeads();
+    } catch (error) {
+      alert('Prepare failed: ' + error);
+    } finally {
+      setPreparingSend(false);
+    }
+  };
+
+  const handleReject = async (lead: Lead) => {
+    if (!confirm(`Reject "${lead.company_name}"? This will mark them as dead.`)) return;
+    
+    await fetch(`/api/leads`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: lead.id, status: 'dead' }),
+    });
+    fetchLeads();
+  };
+
+  const handleSendIMessage = async (lead: Lead) => {
+    setSendingLeadId(lead.id);
+    try {
+      const res = await fetch('/api/leads/send-imessage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lead_id: lead.id }),
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        alert(`✅ Message sent to ${lead.company_name}!\n\nPhone: ${data.recipient}`);
+      } else {
+        alert(`❌ Failed to send to ${lead.company_name}\n\nError: ${data.error}`);
+      }
+      fetchLeads();
+    } catch (error) {
+      alert('Send failed: ' + error);
+    } finally {
+      setSendingLeadId(null);
+    }
   };
 
   const handleResearch = async () => {
@@ -139,28 +204,6 @@ export default function LeadsPage() {
     }
   };
 
-  const handleExport = async () => {
-    setExporting(true);
-    try {
-      const res = await fetch('/api/leads/export', { 
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ limit: 25 }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        alert(`Exported ${data.exported} leads to Desktop: ${data.filename}`);
-      } else {
-        alert(data.error || 'Export failed');
-      }
-      fetchLeads();
-    } catch (error) {
-      alert('Export failed: ' + error);
-    } finally {
-      setExporting(false);
-    }
-  };
-
   const handleCheckResponses = async () => {
     setCheckingResponses(true);
     try {
@@ -183,55 +226,98 @@ export default function LeadsPage() {
     }
   };
 
-  const handleSend = async (lead: Lead) => {
-    // Mark as sent - in production, this would trigger Clawd Cursor to send via StraightText
-    await fetch(`/api/leads`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: lead.id, status: 'sent', message_sent_date: new Date().toISOString() }),
-    });
-    fetchLeads();
-    setSelectedLead(null);
-    alert('SMS sent! (Demo - would trigger Clawd Cursor in production)');
-  };
-
   if (loading) return <div className="p-8 text-center text-gray-400">Loading leads...</div>;
 
   return (
     <div className="min-h-screen bg-[#0A0A0F] p-6">
       <div className="max-w-full mx-auto">
+        
+        {/* OUTREACH QUEUE SECTION */}
+        {outreachLeads.length > 0 && (
+          <div className="mb-8">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                📬 Outreach Queue
+                <span className="bg-orange-600 text-white text-xs px-2 py-1 rounded-full">
+                  {outreachLeads.length}
+                </span>
+              </h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {outreachLeads.map((lead) => (
+                <div 
+                  key={lead.id} 
+                  className="bg-[#1A1A2E] rounded-xl border border-orange-500/30 p-4"
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <h3 className="font-semibold text-white text-sm">{lead.company_name}</h3>
+                    <span className="px-2 py-0.5 rounded-full text-xs bg-orange-900 text-orange-300">
+                      Pending
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-400 mb-2">
+                    📞 {lead.phone}
+                  </div>
+                  <div className="bg-[#0A0A0F] rounded-lg p-3 mb-3 text-xs text-gray-300 border border-[#2A2A3E]">
+                    {lead.message_drafted}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleSendIMessage(lead)}
+                      disabled={sendingLeadId === lead.id}
+                      className="flex-1 py-2 px-3 bg-green-600 text-white text-xs rounded-lg hover:bg-green-500 font-medium disabled:opacity-50"
+                    >
+                      {sendingLeadId === lead.id ? 'Sending...' : '✅ Approve & Send'}
+                    </button>
+                    <button
+                      onClick={() => handleReject(lead)}
+                      disabled={sendingLeadId === lead.id}
+                      className="py-2 px-3 bg-gray-700 text-gray-300 text-xs rounded-lg hover:bg-gray-600 disabled:opacity-50"
+                    >
+                      ❌ Reject
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* HEADER */}
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold text-white">Lead Generation</h1>
-          <button
-            onClick={handleResearch}
-            disabled={researching}
-            className="px-4 py-2 bg-[#22d3ee] text-black rounded-lg hover:bg-[#06b6d4] font-medium disabled:opacity-50"
-          >
-            {researching ? 'Researching...' : 'Research New Leads'}
-          </button>
-          <button
-            onClick={handleGenerateAll}
-            disabled={generatingAll}
-            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium disabled:opacity-50"
-          >
-            {generatingAll ? 'Generating...' : 'Generate All Messages'}
-          </button>
-          <button
-            onClick={handleExport}
-            disabled={exporting}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:opacity-50"
-          >
-            {exporting ? 'Exporting...' : 'Export 25 to CSV'}
-          </button>
-          <button
-            onClick={handleCheckResponses}
-            disabled={checkingResponses}
-            className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 font-medium disabled:opacity-50"
-          >
-            {checkingResponses ? 'Checking...' : 'Check Responses'}
-          </button>
-          <div className="text-sm text-gray-500">
-            {leads.length} total leads
+          <div className="flex gap-2">
+            <button
+              onClick={handleResearch}
+              disabled={researching}
+              className="px-4 py-2 bg-[#22d3ee] text-black rounded-lg hover:bg-[#06b6d4] font-medium disabled:opacity-50"
+            >
+              {researching ? 'Researching...' : 'Research New Leads'}
+            </button>
+            <button
+              onClick={handleGenerateAll}
+              disabled={generatingAll}
+              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium disabled:opacity-50"
+            >
+              {generatingAll ? 'Generating...' : 'Generate All Messages'}
+            </button>
+            <button
+              onClick={handlePrepareSend}
+              disabled={preparingSend}
+              className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-medium disabled:opacity-50"
+            >
+              {preparingSend ? 'Preparing...' : 'Move to Outreach Queue'}
+            </button>
+            <button
+              onClick={handleCheckResponses}
+              disabled={checkingResponses}
+              className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 font-medium disabled:opacity-50"
+            >
+              {checkingResponses ? 'Checking...' : 'Check Responses'}
+            </button>
+            <div className="text-sm text-gray-500 flex items-center">
+              {leads.length} total leads
+            </div>
           </div>
         </div>
 
@@ -247,7 +333,7 @@ export default function LeadsPage() {
                   : 'bg-[#1A1A2E] text-gray-400 hover:bg-[#2A2A3E]'
               }`}
             >
-              {status.charAt(0).toUpperCase() + status.slice(1)} ({count})
+              {status === 'pending_approval' ? 'pending' : status.charAt(0).toUpperCase() + status.slice(1)} ({count})
             </button>
           ))}
         </div>
@@ -258,6 +344,7 @@ export default function LeadsPage() {
             <table className="w-full text-sm">
               <thead className="bg-[#0A0A0F] text-gray-400 text-left">
                 <tr>
+                  <th className="px-4 py-3 font-medium border-b border-[#2A2A3E]">Owner</th>
                   <th className="px-4 py-3 font-medium border-b border-[#2A2A3E]">Company</th>
                   <th className="px-4 py-3 font-medium border-b border-[#2A2A3E]">Phone</th>
                   <th className="px-4 py-3 font-medium border-b border-[#2A2A3E]">City</th>
@@ -272,6 +359,7 @@ export default function LeadsPage() {
               <tbody className="text-gray-300">
                 {filteredLeads.map((lead) => (
                   <tr key={lead.id} className="border-b border-[#2A2A3E] hover:bg-[#2A2A3E]/50">
+                    <td className="px-4 py-3 text-gray-400">{lead.first_name || '-'}</td>
                     <td className="px-4 py-3 font-medium text-white">{lead.company_name}</td>
                     <td className="px-4 py-3 font-mono">{lead.phone}</td>
                     <td className="px-4 py-3">{lead.city}, {lead.state}</td>
@@ -312,7 +400,16 @@ export default function LeadsPage() {
                           onClick={() => setSelectedLead(lead)}
                           className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-500"
                         >
-                          View & Send
+                          View
+                        </button>
+                      )}
+                      {lead.status === 'pending_approval' && (
+                        <button
+                          onClick={() => handleSendIMessage(lead)}
+                          disabled={sendingLeadId === lead.id}
+                          className="px-3 py-1 bg-orange-600 text-white text-xs rounded hover:bg-orange-500 disabled:opacity-50"
+                        >
+                          {sendingLeadId === lead.id ? 'Sending...' : 'Send'}
                         </button>
                       )}
                     </td>
@@ -338,6 +435,7 @@ export default function LeadsPage() {
             
             <div className="space-y-3 mb-4 text-sm">
               <div className="grid grid-cols-2 gap-2">
+                {selectedLead.first_name && <div><span className="text-gray-500">Owner:</span> <span className="text-white">{selectedLead.first_name}</span></div>}
                 <div><span className="text-gray-500">Phone:</span> <span className="text-white font-mono">{selectedLead.phone}</span></div>
                 <div><span className="text-gray-500">Location:</span> <span className="text-white">{selectedLead.city}, {selectedLead.state}</span></div>
                 <div><span className="text-gray-500">Industry:</span> <span className="text-white">{selectedLead.industry}</span></div>
@@ -368,14 +466,24 @@ export default function LeadsPage() {
                 >
                   Generate Message
                 </button>
-              ) : (
+              ) : selectedLead.status === 'drafted' ? (
                 <button
-                  onClick={() => handleSend(selectedLead)}
-                  className="flex-1 py-2 px-4 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium"
+                  onClick={async () => {
+                    // Move to pending_approval directly from drafted
+                    await fetch(`/api/leads`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ id: selectedLead.id, status: 'pending_approval' }),
+                    });
+                    fetchLeads();
+                    setSelectedLead(null);
+                    alert('Moved to Outreach Queue!');
+                  }}
+                  className="flex-1 py-2 px-4 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-medium"
                 >
-                  Send SMS
+                  Move to Queue
                 </button>
-              )}
+              ) : null}
             </div>
           </div>
         </div>

@@ -1,0 +1,117 @@
+import { NextResponse } from 'next/server';
+import pool from '@/lib/db';
+
+const IMessageRelayUrl = 'http://127.0.0.1:8765/send';
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    const { lead_id } = body;
+
+    if (!lead_id) {
+      return NextResponse.json({ error: 'lead_id is required' }, { status: 400 });
+    }
+
+    // Fetch the lead
+    const leadResult = await pool.query(
+      'SELECT * FROM leads WHERE id = $1',
+      [lead_id]
+    );
+
+    if (leadResult.rows.length === 0) {
+      return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
+    }
+
+    const lead = leadResult.rows[0];
+
+    // Validate lead is in pending_approval status
+    if (lead.status !== 'pending_approval') {
+      return NextResponse.json(
+        { error: `Lead must be in 'pending_approval' status to send. Current status: ${lead.status}` },
+        { status: 400 }
+      );
+    }
+
+    // Validate phone and message exist
+    if (!lead.phone) {
+      await pool.query(
+        "UPDATE leads SET status = 'failed', notes = COALESCE(notes, '') || ' | No phone number' WHERE id = $1",
+        [lead_id]
+      );
+      return NextResponse.json({ error: 'Lead has no phone number' }, { status: 400 });
+    }
+
+    if (!lead.message_drafted) {
+      await pool.query(
+        "UPDATE leads SET status = 'failed', notes = COALESCE(notes, '') || ' | No drafted message' WHERE id = $1",
+        [lead_id]
+      );
+      return NextResponse.json({ error: 'Lead has no drafted message' }, { status: 400 });
+    }
+
+    // Call the iMessage relay server
+    let relayResult;
+    try {
+      const response = await fetch(IMessageRelayUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipient: lead.phone,
+          message: lead.message_drafted
+        }),
+        signal: AbortSignal.timeout(30000) // 30 second timeout
+      });
+
+      relayResult = await response.json();
+    } catch (fetchError: any) {
+      await pool.query(
+        "UPDATE leads SET status = 'failed', notes = COALESCE(notes, '') || ' | Relay error: " + 
+        (fetchError.message || 'Unknown error').substring(0, 100) + "' WHERE id = $1",
+        [lead_id]
+      );
+      return NextResponse.json(
+        { error: 'Failed to connect to iMessage relay server', details: fetchError.message },
+        { status: 500 }
+      );
+    }
+
+    // Update lead based on result
+    if (relayResult.success) {
+      await pool.query(
+        `UPDATE leads SET 
+          status = 'sent', 
+          message_sent_date = CURRENT_TIMESTAMP,
+          notes = COALESCE(notes, '') || ' | Sent via iMessage relay'
+        WHERE id = $1`,
+        [lead_id]
+      );
+
+      return NextResponse.json({
+        success: true,
+        lead_id,
+        recipient: lead.phone,
+        timestamp: relayResult.timestamp,
+        message: 'iMessage sent successfully'
+      });
+    } else {
+      // Send failed
+      const errorMsg = relayResult.error || 'Unknown error';
+      await pool.query(
+        "UPDATE leads SET status = 'failed', notes = COALESCE(notes, '') || ' | Send failed: " + 
+        errorMsg.substring(0, 200) + "' WHERE id = $1",
+        [lead_id]
+      );
+
+      return NextResponse.json({
+        success: false,
+        lead_id,
+        recipient: lead.phone,
+        error: errorMsg,
+        error_type: relayResult.error_type || 'unknown'
+      }, { status: 500 });
+    }
+
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
