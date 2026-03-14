@@ -7,18 +7,21 @@ export async function GET(request: Request) {
   const limit = searchParams.get('limit') || '500';
   
   try {
-    let query = `SELECT l.*, fn.first_name 
-                 FROM leads l 
-                 LEFT JOIN lead_first_names fn ON l.id = fn.lead_id 
-                 ORDER BY l.created_at DESC LIMIT $1`;
-    const params: any[] = [limit];
+    let query: string;
+    let params: any[];
     
     if (status) {
       query = `SELECT l.*, fn.first_name 
                FROM leads l 
                LEFT JOIN lead_first_names fn ON l.id = fn.lead_id 
                WHERE l.status = $1 ORDER BY l.created_at DESC LIMIT $2`;
-      params.push(status, limit);
+      params = [status, limit];
+    } else {
+      query = `SELECT l.*, fn.first_name 
+               FROM leads l 
+               LEFT JOIN lead_first_names fn ON l.id = fn.lead_id 
+               ORDER BY l.created_at DESC LIMIT $1`;
+      params = [limit];
     }
     
     const result = await pool.query(query, params);
