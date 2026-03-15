@@ -1,4 +1,6 @@
 'use client';
+// Mission Control - Lead Generation Module
+// Updated: 2026-03-15
 
 import { useState, useEffect } from 'react';
 
