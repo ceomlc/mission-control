@@ -1,6 +1,6 @@
 'use client';
 // Mission Control - Lead Generation Module
-// Updated: 2026-03-15
+// Updated: 2026-03-15 - Added retry functionality
 
 import { useState, useEffect } from 'react';
 
