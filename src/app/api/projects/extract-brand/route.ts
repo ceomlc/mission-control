@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     let style = 'Professional, modern';
 
     try {
-      const fetchResult = await web_fetch({ url, maxChars: 15000 });
+      const fetchResult = await web_fetch(url, 15000);
       websiteContent = fetchResult.text || '';
     } catch (e) {
       // Continue without website content
@@ -80,16 +80,13 @@ export async function POST(request: Request) {
 
     // Search for more info about the company
     try {
-      const searchResult = await web_search({ 
-        query: `${client} ${city} ${state} services offered`, 
-        count: 3 
-      });
+      const searchResult = await web_search(`${client} ${city} ${state} services offered`, 3);
       
-      if (searchResult.results?.length) {
+      if (searchResult.length) {
         // Try to extract services from search results
         const serviceKeywords = ['repair', 'install', 'replacement', 'maintenance', 'service', 'heating', 'cooling', 'air conditioning'];
-        for (const result of searchResult.results.slice(0, 2)) {
-          const snippet = result.snippet || '';
+        for (const result of searchResult.slice(0, 2)) {
+          const snippet = result.description || '';
           for (const keyword of serviceKeywords) {
             if (snippet.toLowerCase().includes(keyword) && !services.some(s => snippet.toLowerCase().includes(s.toLowerCase()))) {
               // Extract the service phrase
@@ -109,13 +106,10 @@ export async function POST(request: Request) {
     // Search for competitors
     let competitors: string[] = [];
     try {
-      const compResult = await web_search({ 
-        query: `top ${industry} companies ${city} ${state}`, 
-        count: 5 
-      });
+      const compResult = await web_search(`top ${industry} companies ${city} ${state}`, 5);
       
-      if (compResult.results?.length) {
-        competitors = compResult.results
+      if (compResult.length) {
+        competitors = compResult
           .map((r: any) => r.title?.replace(/ - .*/g, '').trim())
           .filter((c: string) => c && c !== client && c.length < 50)
           .slice(0, 4);

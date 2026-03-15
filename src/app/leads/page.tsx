@@ -387,6 +387,23 @@ export default function LeadsPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3">
+                      {lead.status === 'failed' && (
+                        <button
+                          onClick={async () => {
+                            if (!confirm(`Retry sending to "${lead.company_name}"? This will move them back to the Outreach Queue.`)) return;
+                            await fetch(`/api/leads`, {
+                              method: 'PATCH',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ id: lead.id, status: 'pending_approval' }),
+                            });
+                            fetchLeads();
+                            alert('Moved back to Outreach Queue!');
+                          }}
+                          className="px-3 py-1 bg-orange-600 text-white text-xs rounded hover:bg-orange-500"
+                        >
+                          🔄 Retry
+                        </button>
+                      )}
                       {lead.status === 'new' && (
                         <button
                           onClick={() => setSelectedLead(lead)}
