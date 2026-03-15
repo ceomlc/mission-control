@@ -65,8 +65,8 @@ export default function LeadsPage() {
     ? leads 
     : leads.filter(l => l.status === filter);
 
-  // Get leads for Outreach Queue (pending_approval status)
-  const outreachLeads = leads.filter(l => l.status === 'pending_approval');
+  // Get leads for Outreach Queue (pending_approval or failed status)
+  const outreachLeads = leads.filter(l => l.status === 'pending_approval' || l.status === 'failed');
 
   const getStatusCounts = () => {
     const counts: Record<string, number> = { all: leads.length };
@@ -247,12 +247,12 @@ export default function LeadsPage() {
               {outreachLeads.map((lead) => (
                 <div 
                   key={lead.id} 
-                  className="bg-[#1A1A2E] rounded-xl border border-orange-500/30 p-4"
+                  className={`bg-[#1A1A2E] rounded-xl border p-4 ${lead.status === 'failed' ? 'border-red-500/50' : 'border-orange-500/30'}`}
                 >
                   <div className="flex justify-between items-start mb-2">
                     <h3 className="font-semibold text-white text-sm">{lead.company_name}</h3>
-                    <span className="px-2 py-0.5 rounded-full text-xs bg-orange-900 text-orange-300">
-                      Pending
+                    <span className={`px-2 py-0.5 rounded-full text-xs ${lead.status === 'failed' ? 'bg-red-900 text-red-300' : 'bg-orange-900 text-orange-300'}`}>
+                      {lead.status === 'failed' ? 'Failed' : 'Pending'}
                     </span>
                   </div>
                   <div className="text-xs text-gray-400 mb-2">
@@ -262,13 +262,23 @@ export default function LeadsPage() {
                     {lead.message_drafted}
                   </div>
                   <div className="flex gap-2">
-                    <button
-                      onClick={() => handleSendIMessage(lead)}
-                      disabled={sendingLeadId === lead.id}
-                      className="flex-1 py-2 px-3 bg-green-600 text-white text-xs rounded-lg hover:bg-green-500 font-medium disabled:opacity-50"
-                    >
-                      {sendingLeadId === lead.id ? 'Sending...' : '✅ Approve & Send'}
-                    </button>
+                    {lead.status === 'failed' ? (
+                      <button
+                        onClick={() => handleSendIMessage(lead)}
+                        disabled={sendingLeadId === lead.id}
+                        className="flex-1 py-2 px-3 bg-orange-600 text-white text-xs rounded-lg hover:bg-orange-500 font-medium disabled:opacity-50"
+                      >
+                        {sendingLeadId === lead.id ? 'Retrying...' : '🔄 Retry'}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleSendIMessage(lead)}
+                        disabled={sendingLeadId === lead.id}
+                        className="flex-1 py-2 px-3 bg-green-600 text-white text-xs rounded-lg hover:bg-green-500 font-medium disabled:opacity-50"
+                      >
+                        {sendingLeadId === lead.id ? 'Sending...' : '✅ Approve & Send'}
+                      </button>
+                    )}
                     <button
                       onClick={() => handleReject(lead)}
                       disabled={sendingLeadId === lead.id}
