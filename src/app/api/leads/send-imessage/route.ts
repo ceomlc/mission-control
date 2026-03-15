@@ -35,7 +35,7 @@ export async function POST(request: Request) {
     // Validate phone and message exist
     if (!lead.phone) {
       await pool.query(
-        "UPDATE leads SET status = 'failed', notes = COALESCE(notes, '') || ' | No phone number' WHERE id = $1",
+        "UPDATE leads SET status = 'failed' WHERE id = $1",
         [lead_id]
       );
       return NextResponse.json({ error: 'Lead has no phone number' }, { status: 400 });
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
 
     if (!lead.message_drafted) {
       await pool.query(
-        "UPDATE leads SET status = 'failed', notes = COALESCE(notes, '') || ' | No drafted message' WHERE id = $1",
+        "UPDATE leads SET status = 'failed' WHERE id = $1",
         [lead_id]
       );
       return NextResponse.json({ error: 'Lead has no drafted message' }, { status: 400 });
@@ -65,8 +65,7 @@ export async function POST(request: Request) {
       relayResult = await response.json();
     } catch (fetchError: any) {
       await pool.query(
-        "UPDATE leads SET status = 'failed', notes = COALESCE(notes, '') || ' | Relay error: " + 
-        (fetchError.message || 'Unknown error').substring(0, 100) + "' WHERE id = $1",
+        "UPDATE leads SET status = 'failed' WHERE id = $1",
         [lead_id]
       );
       return NextResponse.json(
@@ -80,8 +79,7 @@ export async function POST(request: Request) {
       await pool.query(
         `UPDATE leads SET 
           status = 'sent', 
-          message_sent_date = CURRENT_TIMESTAMP,
-          notes = COALESCE(notes, '') || ' | Sent via iMessage relay'
+          message_sent_date = CURRENT_TIMESTAMP
         WHERE id = $1`,
         [lead_id]
       );
@@ -97,8 +95,7 @@ export async function POST(request: Request) {
       // Send failed
       const errorMsg = relayResult.error || 'Unknown error';
       await pool.query(
-        "UPDATE leads SET status = 'failed', notes = COALESCE(notes, '') || ' | Send failed: " + 
-        errorMsg.substring(0, 200) + "' WHERE id = $1",
+        "UPDATE leads SET status = 'failed' WHERE id = $1",
         [lead_id]
       );
 
