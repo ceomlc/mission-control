@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
 
-const IMessageRelayUrl = 'http://127.0.0.1:8765/send';
+const IMessageRelayUrl = 'http://100.79.222.4:8765/send';
 
 export async function POST(request: Request) {
   try {
