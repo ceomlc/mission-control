@@ -9,6 +9,7 @@ const navItems = [
   { href: '/tasks', label: 'Tasks', icon: '✅' },
   { href: '/leads', label: 'Leads', icon: '📱' },
   { href: '/jobs', label: 'Jobs', icon: '💼' },
+  { href: '/vending', label: 'Vending', icon: '🏧' },
   { href: '/content', label: 'Content', icon: '📝' },
   { href: '/agents', label: 'Council', icon: '🤖' },
   { href: '/security', label: 'Security', icon: '🔒' },
@@ -46,20 +47,24 @@ export function Navbar() {
         </div>
 
         <div className="flex items-center gap-1 overflow-x-auto">
-          {navItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`px-2 py-1.5 rounded-lg text-xs sm:text-sm transition whitespace-nowrap ${
-                pathname === item.href
-                  ? 'bg-[#1A1A2E] text-[#22d3ee]'
-                  : 'text-gray-400 hover:text-white hover:bg-[#1A1A2E]'
-              }`}
-            >
-              <span className="mr-1">{item.icon}</span>
-              <span className="hidden md:inline">{item.label}</span>
-            </Link>
-          ))}
+          {navItems.map((item) => {
+            const isActive = pathname === item.href || 
+              (item.href !== '/' && pathname.startsWith(item.href));
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`px-2 py-1.5 rounded-lg text-xs sm:text-sm transition whitespace-nowrap ${
+                  isActive
+                    ? 'bg-[#1A1A2E] text-[#22d3ee]'
+                    : 'text-gray-400 hover:text-white hover:bg-[#1A1A2E]'
+                }`}
+              >
+                <span className="mr-1">{item.icon}</span>
+                <span className="hidden md:inline">{item.label}</span>
+              </Link>
+            );
+          })}
         </div>
 
         <div className="flex items-center gap-2">

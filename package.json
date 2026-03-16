@@ -6,12 +6,14 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "migrate:vending": "ts-node scripts/migrate-vending.ts"
   },
   "dependencies": {
     "@types/pg": "^8.16.0",
     "@types/three": "^0.183.1",
     "next": "^14.2.0",
+    "pg": "^8.20.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "three": "^0.183.1"
@@ -24,7 +26,6 @@
     "dotenv": "^17.3.1",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
-    "pg": "^8.20.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
