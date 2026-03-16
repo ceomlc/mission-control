@@ -52,6 +52,9 @@ export async function POST(request: Request) {
     // Call the iMessage relay server
     let relayResult;
     try {
+      console.log('[iMessage Relay] URL:', IMessageRelayUrl);
+      console.log('[iMessage Relay] Payload:', { recipient: lead.phone, message: lead.message_drafted });
+      
       const response = await fetch(IMessageRelayUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
