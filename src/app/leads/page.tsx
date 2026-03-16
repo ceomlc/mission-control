@@ -151,6 +151,7 @@ export default function LeadsPage() {
   };
 
   const handleSendIMessage = async (lead: Lead) => {
+    console.log('Approve clicked', lead.id);
     setSendingLeadId(lead.id);
     try {
       // Just approve the lead - Athena will handle actual sending
@@ -160,6 +161,7 @@ export default function LeadsPage() {
         body: JSON.stringify({ id: lead.id, status: 'approved' }),
       });
       const data = await res.json();
+      console.log('Approve response', data);
       
       if (data.id) {
         alert(`✅ Approved ${lead.company_name}!\n\nAthena will send the message.`);
@@ -168,6 +170,7 @@ export default function LeadsPage() {
       }
       fetchLeads();
     } catch (error) {
+      console.error('Approve error', error);
       alert('Approve failed: ' + error);
     } finally {
       setSendingLeadId(null);
@@ -275,7 +278,7 @@ export default function LeadsPage() {
                       </button>
                     ) : (
                       <button
-                        onClick={() => handleSendIMessage(lead)}
+                        onClick={() => { console.log('Button clicked for lead', lead.id); handleSendIMessage(lead); }}
                         disabled={sendingLeadId === lead.id}
                         className="flex-1 py-2 px-3 bg-green-600 text-white text-xs rounded-lg hover:bg-green-500 font-medium disabled:opacity-50"
                       >
