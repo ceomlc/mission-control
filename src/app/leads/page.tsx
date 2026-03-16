@@ -153,21 +153,22 @@ export default function LeadsPage() {
   const handleSendIMessage = async (lead: Lead) => {
     setSendingLeadId(lead.id);
     try {
-      const res = await fetch('/api/leads/send-imessage', {
-        method: 'POST',
+      // Just approve the lead - Athena will handle actual sending
+      const res = await fetch(`/api/leads`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lead_id: lead.id }),
+        body: JSON.stringify({ id: lead.id, status: 'approved' }),
       });
       const data = await res.json();
       
-      if (data.success) {
-        alert(`✅ Message sent to ${lead.company_name}!\n\nPhone: ${data.recipient}`);
+      if (data.id) {
+        alert(`✅ Approved ${lead.company_name}!\n\nAthena will send the message.`);
       } else {
-        alert(`❌ Failed to send to ${lead.company_name}\n\nError: ${data.error}`);
+        alert(`❌ Failed to approve ${lead.company_name}`);
       }
       fetchLeads();
     } catch (error) {
-      alert('Send failed: ' + error);
+      alert('Approve failed: ' + error);
     } finally {
       setSendingLeadId(null);
     }
@@ -278,7 +279,7 @@ export default function LeadsPage() {
                         disabled={sendingLeadId === lead.id}
                         className="flex-1 py-2 px-3 bg-green-600 text-white text-xs rounded-lg hover:bg-green-500 font-medium disabled:opacity-50"
                       >
-                        {sendingLeadId === lead.id ? 'Sending...' : '✅ Approve & Send'}
+                        {sendingLeadId === lead.id ? 'Approving...' : '✅ Approve'}
                       </button>
                     )}
                     <button
