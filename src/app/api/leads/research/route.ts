@@ -11,6 +11,53 @@ const CITIES = [
   'Boston', 'Providence', 'Norfolk', 'Virginia Beach', 'Richmond'
 ];
 
+// Helper to check if website loads and get status
+async function checkWebsite(websiteUrl: string): Promise<string> {
+  if (!websiteUrl) return 'none';
+  
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    
+    const response = await fetch(websiteUrl, { 
+      signal: controller.signal,
+      redirect: 'follow'
+    });
+    clearTimeout(timeout);
+    
+    if (!response.ok) return 'outdated';
+    
+    const html = await response.text().catch(() => '');
+    
+    // Simple check for modern website indicators
+    const hasTailwind = html.includes('tailwind') || html.includes('bootstrap') || html.includes('foundation');
+    const hasReact = html.includes('react') || html.includes('vue') || html.includes('angular');
+    const hasModernCss = html.includes('grid') || html.includes('flexbox') || html.includes('var(--');
+    
+    if (hasTailwind || hasReact || hasModernCss) return 'modern';
+    return 'outdated';
+  } catch {
+    return 'none';
+  }
+}
+
+// Generate personal observation based on priority
+function generatePersonalObservation(websiteStatus: string, googleRating: number | null, reviewCount: number): string {
+  if (websiteStatus === 'none') {
+    return "you don't have a website yet";
+  }
+  if (googleRating !== null && googleRating < 4.0) {
+    return `your Google rating is sitting at ${googleRating} stars`;
+  }
+  if (reviewCount < 5) {
+    return `you only have ${reviewCount} Google reviews showing up`;
+  }
+  if (websiteStatus === 'outdated') {
+    return "your website looks like it could use a refresh";
+  }
+  return "there's room to get more calls coming in online";
+}
+
 export async function POST(request: Request) {
   const body = await request.json();
   const { trade, city, limit = 100 } = body;
@@ -47,7 +94,11 @@ export async function POST(request: Request) {
               review_count: result.user_ratings_total || 0,
               status: 'researched',
               source: 'google_maps_automated',
-              notes: `Google Maps: ${result.formatted_address}`
+              notes: `Google Maps: ${result.formatted_address}`,
+              // Additional research fields
+              google_presence: result.rating 
+                ? `${result.rating} stars, ${result.user_ratings_total || 0} reviews, in map pack`
+                : 'not in Google Maps'
             });
           }
         } catch (e) {
@@ -64,14 +115,53 @@ export async function POST(request: Request) {
     for (const lead of unique.slice(0, limit)) {
       try {
         await pool.query(
-          `INSERT INTO leads (company_name, phone, city, state, industry, website_url, has_website, google_rating, review_count, status, source, notes)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+          `INSERT INTO leads (company_name, phone, city, state, industry, website_url, has_website, google_rating, review_count, status, source, notes, google_presence)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
            ON CONFLICT DO NOTHING`,
-          [lead.company_name, lead.phone, lead.city, lead.state, lead.industry, lead.website_url, lead.has_website, lead.google_rating, lead.review_count, lead.status, lead.source, lead.notes]
+          [lead.company_name, lead.phone, lead.city, lead.state, lead.industry, lead.website_url, lead.has_website, lead.google_rating, lead.review_count, lead.status, lead.source, lead.notes, lead.google_presence]
         );
         added++;
       } catch (e) {
         console.error('Insert error:', e);
+      }
+    }
+
+    // Second research pass: check websites and generate personal observations
+    const leadsToResearch = await pool.query(
+      `SELECT id, company_name, website_url, google_rating, review_count, personal_observation 
+       FROM leads WHERE research_completed = FALSE AND website_url IS NOT NULL AND website_url != '' 
+       LIMIT 50`
+    );
+
+    for (const lead of leadsToResearch.rows) {
+      try {
+        // Check website status
+        const websiteStatus = await checkWebsite(lead.website_url);
+        
+        // Generate personal observation
+        const personalObservation = generatePersonalObservation(
+          websiteStatus, 
+          lead.google_rating, 
+          lead.review_count
+        );
+        
+        // Get latest data for this lead
+        const latestLead = unique.find(l => l.company_name.toLowerCase() === lead.company_name.toLowerCase());
+        const googlePresence = latestLead?.google_presence || (lead.google_rating 
+          ? `${lead.google_rating} stars, ${lead.review_count} reviews`
+          : 'not in Google Maps');
+        
+        await pool.query(
+          `UPDATE leads SET 
+            website_status = $1,
+            personal_observation = $2,
+            google_presence = $3,
+            research_completed = TRUE
+           WHERE id = $4`,
+          [websiteStatus, personalObservation, googlePresence, lead.id]
+        );
+      } catch (e) {
+        console.error('Research update error:', e);
       }
     }
 

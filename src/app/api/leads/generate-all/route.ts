@@ -5,6 +5,15 @@ function generateMessage(lead: any): string {
   const firstName = lead.company_name?.split(' ')[0] || 'there';
   const city = lead.city || 'Baltimore';
   const industry = lead.industry || 'trade';
+  
+  // Use personal_observation from database if available
+  const personalObservation = lead.personal_observation;
+  
+  if (personalObservation) {
+    return `Hey ${firstName} — I was looking into ${lead.company_name} online and noticed ${personalObservation}.\n\nI went ahead and put together a free website concept for you — already built it out. Want to see it?`;
+  }
+  
+  // Fallback to old logic if no personal_observation
   const hasWebsite = lead.has_website;
   const rating = lead.google_rating;
   const reviewCount = lead.review_count || 0;
