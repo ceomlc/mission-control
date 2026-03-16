@@ -22,6 +22,13 @@ interface Lead {
   source: string;
   notes: string;
   created_at: string;
+  // Research fields
+  personal_observation?: string;
+  website_status?: string;
+  google_presence?: string;
+  review_highlights?: string;
+  social_media?: string;
+  research_completed?: boolean;
 }
 
 const statusColors: Record<string, string> = {
@@ -376,7 +383,10 @@ export default function LeadsPage() {
                 {filteredLeads.map((lead) => (
                   <tr key={lead.id} className="border-b border-[#2A2A3E] hover:bg-[#2A2A3E]/50">
                     <td className="px-4 py-3 text-gray-400">{lead.first_name || '-'}</td>
-                    <td className="px-4 py-3 font-medium text-white">{lead.company_name}</td>
+                    <td className="px-4 py-3 font-medium text-white">
+                      {lead.company_name}
+                      {lead.research_completed && <span className="ml-1 text-green-400" title="Research complete">🔍</span>}
+                    </td>
                     <td className="px-4 py-3 font-mono">{lead.phone}</td>
                     <td className="px-4 py-3">{lead.city}, {lead.state}</td>
                     <td className="px-4 py-3">{lead.industry}</td>
@@ -477,6 +487,47 @@ export default function LeadsPage() {
                 <div><span className="text-gray-500">Website:</span> <span className="text-white">{selectedLead.website_url || 'None'}</span></div>
               </div>
             </div>
+
+            {/* Research Summary */}
+            {selectedLead.research_completed && (
+              <div className="bg-[#0A0A0F] rounded-lg p-4 mb-4 border border-[#2A2A3E]">
+                <p className="text-sm text-gray-500 mb-3 font-medium">🔍 Research Summary</p>
+                <div className="space-y-2 text-xs">
+                  {selectedLead.website_status && (
+                    <div className="flex gap-2">
+                      <span className="text-gray-500 w-24 flex-shrink-0">Website:</span>
+                      <span className={`${selectedLead.website_status === 'none' ? 'text-red-400' : selectedLead.website_status === 'outdated' ? 'text-yellow-400' : 'text-green-400'}`}>
+                        {selectedLead.website_status === 'none' ? '❌ No website' : selectedLead.website_status === 'outdated' ? '⚠️ Outdated' : '✅ Modern'}
+                      </span>
+                    </div>
+                  )}
+                  {selectedLead.google_presence && (
+                    <div className="flex gap-2">
+                      <span className="text-gray-500 w-24 flex-shrink-0">Google:</span>
+                      <span className="text-gray-300">{selectedLead.google_presence}</span>
+                    </div>
+                  )}
+                  {selectedLead.review_highlights && (
+                    <div className="flex gap-2">
+                      <span className="text-gray-500 w-24 flex-shrink-0">Reviews:</span>
+                      <span className="text-gray-300">{selectedLead.review_highlights}</span>
+                    </div>
+                  )}
+                  {selectedLead.social_media && (
+                    <div className="flex gap-2">
+                      <span className="text-gray-500 w-24 flex-shrink-0">Social:</span>
+                      <span className="text-gray-300">{selectedLead.social_media}</span>
+                    </div>
+                  )}
+                  {selectedLead.personal_observation && (
+                    <div className="flex gap-2 mt-2 pt-2 border-t border-[#2A2A3E]">
+                      <span className="text-gray-500 w-24 flex-shrink-0">Hook:</span>
+                      <span className="text-cyan-400 italic">"{selectedLead.personal_observation}"</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div className="bg-[#0A0A0F] rounded-lg p-4 mb-4 border border-[#2A2A3E]">
               <p className="text-sm text-gray-500 mb-2">Message Preview:</p>
