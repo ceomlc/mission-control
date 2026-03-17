@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useState, useEffect } from 'react';
 
 const navItems = [
   { href: '/vending', label: 'Overview', icon: '📋' },
@@ -12,6 +13,20 @@ const navItems = [
 
 export default function VendingLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => {
+    async function fetchCounts() {
+      try {
+        const res = await fetch('/api/vending/outreach?status=draft');
+        const data = await res.json();
+        setPendingCount(data.outreach?.length || 0);
+      } catch (e) {
+        console.error('Failed to fetch counts:', e);
+      }
+    }
+    fetchCounts();
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#0A0A0F]">
@@ -34,9 +49,9 @@ export default function VendingLayout({ children }: { children: React.ReactNode 
               >
                 <span>{item.icon}</span>
                 <span>{item.label}</span>
-                {item.badge && (
+                {item.badge && pendingCount > 0 && (
                   <span className="bg-orange-600 text-white text-xs px-1.5 py-0.5 rounded-full">
-                    0
+                    {pendingCount}
                   </span>
                 )}
               </Link>
