@@ -59,7 +59,7 @@ export default function OutreachPage() {
       setLoading(true);
       try {
         const [pendingRes, activeRes] = await Promise.all([
-          fetch('/api/vending/outreach?status=pending_approval'),
+          fetch('/api/vending/outreach?status=draft'),
           fetch('/api/vending/outreach?status=active'),
         ]);
         const pendingData = await pendingRes.json();
