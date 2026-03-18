@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import pool from '@/lib/vending-db';
 import { VendingLead } from '@/lib/vending-types';

@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 
 const GATEWAY_URL = process.env.GATEWAY_URL || 'http://localhost:18789';
