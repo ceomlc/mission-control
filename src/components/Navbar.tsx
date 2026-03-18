@@ -10,6 +10,7 @@ const navItems = [
   { href: '/leads', label: 'Leads', icon: '📱' },
   { href: '/jobs', label: 'Jobs', icon: '💼' },
   { href: '/vending', label: 'Vending', icon: '🏧' },
+  { href: '/kpi', label: 'KPIs', icon: '📊' },
   { href: '/content', label: 'Content', icon: '📝' },
   { href: '/agents', label: 'Council', icon: '🤖' },
   { href: '/security', label: 'Security', icon: '🔒' },

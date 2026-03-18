@@ -9,7 +9,6 @@ const navItems = [
   { href: '/vending/leads', label: 'Leads', icon: '🎯' },
   { href: '/vending/outreach', label: 'Outreach', icon: '📬', badge: true },
   { href: '/vending/placements', label: 'Placements', icon: '🏆' },
-  { href: '/vending/kpi', label: 'KPIs', icon: '📊' },
 ];
 
 export default function VendingLayout({ children }: { children: React.ReactNode }) {
