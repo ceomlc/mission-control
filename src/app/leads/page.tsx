@@ -158,7 +158,10 @@ export default function LeadsPage() {
   };
 
   const generateMessage = (lead: Lead) => {
-    const firstName = lead.first_name || lead.company_name.split(' ')[0];
+    const rawName = (lead.owner_name || '').trim();
+    const firstName = rawName.length > 1 && rawName.split(' ').length <= 3
+      ? rawName.split(' ')[0].replace(/[^a-zA-Z]/g, '')
+      : 'there';
     const city = lead.city || 'Baltimore';
     const industryTemplates = templates[lead.industry as keyof typeof templates] || templates['HVAC'];
     const template = industryTemplates[Math.floor(Math.random() * industryTemplates.length)];
