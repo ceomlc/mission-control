@@ -36,7 +36,7 @@ const statusColors: Record<string, string> = {
   researched: 'bg-blue-900 text-blue-300',
   drafted: 'bg-yellow-900 text-yellow-300',
   pending_approval: 'bg-orange-900 text-orange-300',
-  approved: 'bg-cyan-900 text-cyan-300',
+  approved: 'bg-[#3D0007] text-[#DC143C]',
   sent: 'bg-green-900 text-green-300',
   failed: 'bg-red-900 text-red-300',
   responded: 'bg-purple-900 text-purple-300',
@@ -53,10 +53,37 @@ export default function LeadsPage() {
   const [preparingSend, setPreparingSend] = useState(false);
   const [checkingResponses, setCheckingResponses] = useState(false);
   const [sendingLeadId, setSendingLeadId] = useState<number | null>(null);
+  const [loomInput, setLoomInput] = useState('');
+  const [callOutcomeInput, setCallOutcomeInput] = useState('');
+  const [savingField, setSavingField] = useState(false);
+  const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
+  const [editingMessageText, setEditingMessageText] = useState('');
 
   useEffect(() => {
     fetchLeads();
   }, []);
+
+  useEffect(() => {
+    if (selectedLead) {
+      setLoomInput((selectedLead as any).loom_url || '');
+      setCallOutcomeInput((selectedLead as any).call_outcome || '');
+    }
+  }, [selectedLead]);
+
+  const handleSaveField = async (field: string, value: string) => {
+    if (!selectedLead || !value) return;
+    setSavingField(true);
+    try {
+      await fetch('/api/leads', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: selectedLead.id, [field]: value }),
+      });
+      fetchLeads();
+    } finally {
+      setSavingField(false);
+    }
+  };
 
   const fetchLeads = async () => {
     try {
@@ -70,9 +97,27 @@ export default function LeadsPage() {
     }
   };
 
-  const filteredLeads = filter === 'all' 
-    ? leads 
-    : leads.filter(l => l.status === filter);
+  // Statuses that require a phone number to be valid
+  const CONTACT_STATUSES = new Set(['replied', 'hot', 'cold', 'opted_out', 'sent', 'approved', 'pending_approval']);
+
+  const filteredLeads = (() => {
+    let base = filter === 'all'
+      ? leads.filter(l => l.status !== 'dead')
+      : leads.filter(l => l.status === filter);
+
+    // For reply-type statuses, only show leads that actually have a phone
+    // (no phone = data issue, couldn't have been contacted)
+    if (CONTACT_STATUSES.has(filter)) {
+      base = base.filter(l => l.phone && l.phone.trim() !== '');
+    }
+
+    return base;
+  })();
+
+  // Phoneless leads that ended up in a contact-required status — data problems
+  const phonelessContactLeads = leads.filter(
+    l => CONTACT_STATUSES.has(l.status) && (!l.phone || l.phone.trim() === '')
+  );
 
   // Get leads for Outreach Queue (pending_approval or failed status)
   const outreachLeads = leads.filter(l => l.status === 'pending_approval' || l.status === 'failed');
@@ -147,38 +192,43 @@ export default function LeadsPage() {
   };
 
   const handleReject = async (lead: Lead) => {
-    if (!confirm(`Reject "${lead.company_name}"? This will mark them as dead.`)) return;
-    
-    await fetch(`/api/leads`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: lead.id, status: 'dead' }),
-    });
-    fetchLeads();
+    if (!confirm(`Reject "${lead.company_name}"? This will permanently remove them from the pipeline.`)) return;
+
+    try {
+      const res = await fetch('/api/leads', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: lead.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(`Failed to reject: ${data.error || 'Unknown error'}`);
+        return;
+      }
+      fetchLeads();
+    } catch (err) {
+      alert('Reject failed: ' + err);
+    }
   };
 
   const handleSendIMessage = async (lead: Lead) => {
-    console.log('Approve clicked', lead.id);
     setSendingLeadId(lead.id);
     try {
-      // Just approve the lead - Athena will handle actual sending
-      const res = await fetch(`/api/leads`, {
-        method: 'PATCH',
+      const res = await fetch('/api/leads/send-imessage', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: lead.id, status: 'approved' }),
+        body: JSON.stringify({ lead_id: lead.id }),
       });
       const data = await res.json();
-      console.log('Approve response', data);
-      
-      if (data.id) {
-        alert(`✅ Approved ${lead.company_name}!\n\nAthena will send the message.`);
+      if (res.ok && data.success) {
+        alert(`✅ iMessage sent to ${lead.company_name}!`);
       } else {
-        alert(`❌ Failed to approve ${lead.company_name}`);
+        alert(`❌ Send failed: ${data.error || 'Unknown error'}`);
       }
       fetchLeads();
     } catch (error) {
-      console.error('Approve error', error);
-      alert('Approve failed: ' + error);
+      console.error('Send error', error);
+      alert('Send failed: ' + error);
     } finally {
       setSendingLeadId(null);
     }
@@ -271,8 +321,50 @@ export default function LeadsPage() {
                   <div className="text-xs text-gray-400 mb-2">
                     📞 {lead.phone}
                   </div>
-                  <div className="bg-[#0A0A0F] rounded-lg p-3 mb-3 text-xs text-gray-300 border border-[#2A2A3E]">
-                    {lead.message_drafted}
+                  <div className="relative bg-[#0A0A0F] rounded-lg p-3 mb-3 border border-[#2A2A3E]">
+                    {editingMessageId === lead.id ? (
+                      <div>
+                        <textarea
+                          value={editingMessageText}
+                          onChange={e => setEditingMessageText(e.target.value)}
+                          className="w-full bg-transparent text-xs text-gray-200 resize-none outline-none min-h-[80px]"
+                          autoFocus
+                        />
+                        <div className="flex gap-2 mt-2 justify-end">
+                          <button
+                            onClick={() => setEditingMessageId(null)}
+                            className="px-2 py-1 text-[10px] text-gray-500 hover:text-gray-300"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={async () => {
+                              await fetch('/api/leads', {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ id: lead.id, message_drafted: editingMessageText }),
+                              });
+                              setEditingMessageId(null);
+                              fetchLeads();
+                            }}
+                            className="px-2 py-1 text-[10px] bg-green-700 text-green-200 rounded hover:bg-green-600"
+                          >
+                            Save
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-xs text-gray-300 pr-6">{lead.message_drafted}</p>
+                        <button
+                          onClick={() => { setEditingMessageId(lead.id); setEditingMessageText(lead.message_drafted); }}
+                          className="absolute top-2 right-2 text-gray-600 hover:text-gray-300 text-[10px]"
+                          title="Edit message"
+                        >
+                          ✏️
+                        </button>
+                      </>
+                    )}
                   </div>
                   <div className="flex gap-2">
                     {lead.status === 'failed' ? (
@@ -313,7 +405,7 @@ export default function LeadsPage() {
             <button
               onClick={handleResearch}
               disabled={researching}
-              className="px-4 py-2 bg-[#22d3ee] text-black rounded-lg hover:bg-[#06b6d4] font-medium disabled:opacity-50"
+              className="px-4 py-2 bg-[#DC143C] text-white rounded-lg hover:bg-[#b01030] font-medium disabled:opacity-50"
             >
               {researching ? 'Researching...' : 'Research New Leads'}
             </button>
@@ -334,7 +426,7 @@ export default function LeadsPage() {
             <button
               onClick={handleCheckResponses}
               disabled={checkingResponses}
-              className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 font-medium disabled:opacity-50"
+              className="px-4 py-2 bg-[#DC143C] text-white rounded-lg hover:bg-[#b01030] font-medium disabled:opacity-50"
             >
               {checkingResponses ? 'Checking...' : 'Check Responses'}
             </button>
@@ -352,7 +444,7 @@ export default function LeadsPage() {
               onClick={() => setFilter(status)}
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${
                 filter === status 
-                  ? 'bg-[#22d3ee] text-black' 
+                  ? 'bg-[#DC143C] text-white'
                   : 'bg-[#1A1A2E] text-gray-400 hover:bg-[#2A2A3E]'
               }`}
             >
@@ -360,6 +452,23 @@ export default function LeadsPage() {
             </button>
           ))}
         </div>
+
+        {/* Data Issues Banner */}
+        {phonelessContactLeads.length > 0 && (
+          <div className="mb-4 bg-red-950/40 border border-red-500/30 rounded-lg px-4 py-3 flex items-center justify-between">
+            <div className="text-sm text-red-300">
+              <span className="font-semibold">⚠️ {phonelessContactLeads.length} data issue{phonelessContactLeads.length > 1 ? 's' : ''}:</span>
+              {' '}leads in <span className="font-mono">{[...new Set(phonelessContactLeads.map(l => l.status))].join(', ')}</span> status with no phone number.
+              These are hidden from their status views.
+            </div>
+            <button
+              onClick={() => setFilter('all')}
+              className="text-xs text-red-400 hover:text-red-200 underline ml-4 flex-shrink-0"
+            >
+              View All →
+            </button>
+          </div>
+        )}
 
         {/* Spreadsheet Layout */}
         <div className="bg-[#1A1A2E] rounded-xl border border-[#2A2A3E] overflow-hidden">
@@ -387,12 +496,18 @@ export default function LeadsPage() {
                       {lead.company_name}
                       {lead.research_completed && <span className="ml-1 text-green-400" title="Research complete">🔍</span>}
                     </td>
-                    <td className="px-4 py-3 font-mono">{lead.phone}</td>
+                    <td className="px-4 py-3 font-mono">
+                      {lead.phone && lead.phone.trim() !== '' ? (
+                        lead.phone
+                      ) : (
+                        <span className="text-red-400 text-xs font-sans">⚠️ No phone</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3">{lead.city}, {lead.state}</td>
                     <td className="px-4 py-3">{lead.industry}</td>
                     <td className="px-4 py-3">
                       {lead.website_url ? (
-                        <a href={lead.website_url} target="_blank" rel="noopener noreferrer" className="text-[#22d3ee] hover:underline">
+                        <a href={lead.website_url} target="_blank" rel="noopener noreferrer" className="text-[#DC143C] hover:underline">
                           Visit →
                         </a>
                       ) : (
@@ -433,7 +548,7 @@ export default function LeadsPage() {
                       {lead.status === 'new' && (
                         <button
                           onClick={() => setSelectedLead(lead)}
-                          className="px-3 py-1 bg-[#22d3ee] text-black text-xs rounded hover:bg-[#06b6d4] mr-2"
+                          className="px-3 py-1 bg-[#DC143C] text-white text-xs rounded hover:bg-[#b01030] mr-2"
                         >
                           Preview
                         </button>
@@ -522,7 +637,7 @@ export default function LeadsPage() {
                   {selectedLead.personal_observation && (
                     <div className="flex gap-2 mt-2 pt-2 border-t border-[#2A2A3E]">
                       <span className="text-gray-500 w-24 flex-shrink-0">Hook:</span>
-                      <span className="text-cyan-400 italic">"{selectedLead.personal_observation}"</span>
+                      <span className="italic" style={{ color: '#DC143C' }}>"{selectedLead.personal_observation}"</span>
                     </div>
                   )}
                 </div>
@@ -536,6 +651,61 @@ export default function LeadsPage() {
               </p>
             </div>
 
+            {/* Loom & Call Outcome — shown for leads that have been sent */}
+            {['sent', 'hot', 'replied', 'cold', 'booked'].includes(selectedLead.status) && (
+              <div className="bg-[#0A0A0F] rounded-lg p-4 mb-4 border border-[#2A2A3E] space-y-3">
+                <p className="text-sm text-gray-500 font-medium">📋 Log Outreach Data</p>
+
+                {/* Loom URL */}
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Loom URL</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="url"
+                      value={loomInput}
+                      onChange={e => setLoomInput(e.target.value)}
+                      placeholder="https://loom.com/share/..."
+                      className="flex-1 bg-[#1A1A2E] border border-[#2A2A3E] rounded px-3 py-1.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-[#DC143C]"
+                    />
+                    <button
+                      onClick={() => handleSaveField('loom_url', loomInput)}
+                      disabled={savingField || !loomInput}
+                      className="px-3 py-1.5 bg-[#DC143C] text-white text-xs rounded hover:bg-[#b01030] disabled:opacity-40"
+                    >
+                      Save
+                    </button>
+                  </div>
+                </div>
+
+                {/* Call Outcome */}
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Call Outcome</label>
+                  <div className="flex gap-2">
+                    <select
+                      value={callOutcomeInput}
+                      onChange={e => setCallOutcomeInput(e.target.value)}
+                      className="flex-1 bg-[#1A1A2E] border border-[#2A2A3E] rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#DC143C]"
+                    >
+                      <option value="">— select outcome —</option>
+                      <option value="booked">✅ Booked</option>
+                      <option value="callback_requested">📅 Callback Requested</option>
+                      <option value="voicemail">📭 Voicemail</option>
+                      <option value="no_answer">📵 No Answer</option>
+                      <option value="not_interested">❌ Not Interested</option>
+                      <option value="wrong_number">🚫 Wrong Number</option>
+                    </select>
+                    <button
+                      onClick={() => handleSaveField('call_outcome', callOutcomeInput)}
+                      disabled={savingField || !callOutcomeInput}
+                      className="px-3 py-1.5 bg-[#DC143C] text-white text-xs rounded hover:bg-[#b01030] disabled:opacity-40"
+                    >
+                      Save
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-3">
               <button
                 onClick={() => setSelectedLead(null)}
@@ -546,7 +716,7 @@ export default function LeadsPage() {
               {selectedLead.status === 'new' ? (
                 <button
                   onClick={() => handleApprove(selectedLead)}
-                  className="flex-1 py-2 px-4 bg-[#22d3ee] text-black rounded-lg hover:bg-[#06b6d4] font-medium"
+                  className="flex-1 py-2 px-4 bg-[#DC143C] text-white rounded-lg hover:bg-[#b01030] font-medium"
                 >
                   Generate Message
                 </button>

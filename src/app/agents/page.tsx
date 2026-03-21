@@ -12,6 +12,7 @@ const ROOM_BG = "https://files.manuscdn.com/user_upload_by_module/session_file/1
 
 type TaskType = "coding" | "research" | "writing" | "planning" | "security" | "break" | "coffee" | "gaming" | "idle";
 type AgentStatus = "active" | "chatting" | "idle";
+type Machine = "athena" | "thoth";
 
 interface Agent {
   id: string;
@@ -22,6 +23,7 @@ interface Agent {
   taskType: TaskType;
   color: string;
   station: string;
+  machine: Machine;
   joinedAt?: number;
   taskHistory?: { task: string; taskType: TaskType; startTime: number; duration: number }[];
   totalTokens?: number;
@@ -81,63 +83,98 @@ function statusForTaskType(taskType: TaskType): AgentStatus {
 
 // ─── Default Agents ─────────────────────────────────────────────────────────
 
-const DEFAULT_AGENTS: Agent[] = [
-  { id: "athena",     name: "Athena",     role: "Manager",    status: "active",   task: "Reviewing reports",  taskType: "research",  color: "#06b6d4", station: "deskCenterLeft" },
-  { id: "builder",    name: "Builder",    role: "Developer",  status: "active",   task: "Writing code",       taskType: "coding",    color: "#3b82f6", station: "deskCenterRight" },
-  { id: "writer",     name: "Writer",     role: "Content",    status: "active",   task: "Drafting article",   taskType: "writing",   color: "#8b5cf6", station: "deskFrontLeft" },
-  { id: "researcher", name: "Researcher", role: "Analyst",    status: "active",   task: "Gathering data",     taskType: "research",  color: "#06b6d4", station: "deskLeftWall" },
-  { id: "strategist", name: "Strategist", role: "Planner",    status: "chatting", task: "Campaign planning",  taskType: "planning",  color: "#a855f7", station: "beanBagPurple" },
-  { id: "security",   name: "Security",   role: "Guard",      status: "active",   task: "Security audit",     taskType: "security",  color: "#6b7280", station: "securityDesk" },
+const ATHENA_DEFAULTS: Agent[] = [
+  { id: "athena",    name: "Athena",    role: "Operations Manager",  status: "active",   task: "Monitoring systems",   taskType: "research",  color: "#06b6d4", station: "deskCenterLeft",  machine: "athena" },
+  { id: "herald",    name: "Herald",    role: "Response Monitor",    status: "active",   task: "Watching for replies", taskType: "research",  color: "#22d3ee", station: "deskCenterRight", machine: "athena" },
+  { id: "relay",     name: "Relay",     role: "iMessage Gateway",    status: "active",   task: "Standing by",          taskType: "security",  color: "#0e7490", station: "securityDesk",    machine: "athena" },
+  { id: "tunnel",    name: "Tunnel",    role: "Cloudflare Proxy",    status: "active",   task: "Routing traffic",      taskType: "security",  color: "#155e75", station: "deskFrontLeft",   machine: "athena" },
+  { id: "scheduler", name: "Scheduler", role: "Cron Job Runner",     status: "chatting", task: "Waiting for trigger",  taskType: "planning",  color: "#164e63", station: "deskLeftWall",    machine: "athena" },
+  { id: "approver",  name: "Approver",  role: "Outreach Gatekeeper", status: "active",   task: "Reviewing queue",      taskType: "research",  color: "#0891b2", station: "beanBagBlue",     machine: "athena" },
 ];
+
+const THOTH_DEFAULTS: Agent[] = [
+  { id: "thoth",      name: "Thoth",      role: "Research & Lead Scout", status: "active",   task: "Idle",              taskType: "idle",     color: "#f59e0b", station: "deskCenterLeft",  machine: "thoth" },
+  { id: "scout",      name: "Scout",      role: "Lead Sourcer",          status: "active",   task: "Awaiting run",      taskType: "research", color: "#fbbf24", station: "deskCenterRight", machine: "thoth" },
+  { id: "qualifier",  name: "Qualifier",  role: "Lead Scorer",           status: "active",   task: "Awaiting run",      taskType: "coding",   color: "#f97316", station: "deskFrontLeft",   machine: "thoth" },
+  { id: "hermes",     name: "Hermes",     role: "Outreach Writer",       status: "active",   task: "Awaiting run",      taskType: "writing",  color: "#fb923c", station: "deskLeftWall",    machine: "thoth" },
+  { id: "enricher",   name: "Enricher",   role: "Email Finder",          status: "chatting", task: "Awaiting run",      taskType: "research", color: "#a78bfa", station: "beanBagPurple",   machine: "thoth" },
+];
+
+const DEFAULT_AGENTS: Agent[] = [...ATHENA_DEFAULTS, ...THOTH_DEFAULTS];
 
 // ─── Demo Simulation Task Queues ────────────────────────────────────────────
 
 interface SimTask { task: string; taskType: TaskType; durationSec: number; }
 
 const SIM_QUEUES: Record<string, SimTask[]> = {
+  // ── Athena's machine ──
   athena: [
-    { task: "Reviewing reports",   taskType: "research", durationSec: 25 },
-    { task: "Team standup",        taskType: "planning", durationSec: 20 },
-    { task: "Approving PRs",       taskType: "coding",   durationSec: 30 },
-    { task: "Coffee break",        taskType: "coffee",   durationSec: 15 },
-    { task: "Strategic planning",  taskType: "planning", durationSec: 25 },
-    { task: "Relaxing",            taskType: "gaming",   durationSec: 20 },
+    { task: "Monitoring systems",      taskType: "research", durationSec: 30 },
+    { task: "Reviewing lead responses",taskType: "research", durationSec: 25 },
+    { task: "Running check-responses", taskType: "security", durationSec: 20 },
+    { task: "Coffee break",            taskType: "coffee",   durationSec: 15 },
+    { task: "Approving outreach",      taskType: "planning", durationSec: 25 },
   ],
-  builder: [
-    { task: "Writing code",         taskType: "coding",   durationSec: 35 },
-    { task: "Debugging issue",      taskType: "coding",   durationSec: 25 },
-    { task: "Code review",          taskType: "coding",   durationSec: 20 },
-    { task: "Coffee break",         taskType: "coffee",   durationSec: 15 },
-    { task: "Architecture planning", taskType: "planning", durationSec: 20 },
-    { task: "Playing games",        taskType: "gaming",   durationSec: 20 },
+  herald: [
+    { task: "Watching for replies",  taskType: "research", durationSec: 40 },
+    { task: "Processing new reply",  taskType: "coding",   durationSec: 20 },
+    { task: "Updating lead status",  taskType: "coding",   durationSec: 15 },
+    { task: "Coffee break",          taskType: "coffee",   durationSec: 15 },
+    { task: "Watching for replies",  taskType: "research", durationSec: 35 },
   ],
-  writer: [
-    { task: "Drafting article",    taskType: "writing",  durationSec: 30 },
-    { task: "Editing copy",        taskType: "writing",  durationSec: 25 },
-    { task: "Brainstorming ideas", taskType: "planning", durationSec: 20 },
-    { task: "Coffee break",        taskType: "coffee",   durationSec: 15 },
-    { task: "SEO research",        taskType: "research", durationSec: 25 },
+  relay: [
+    { task: "Standing by",           taskType: "security", durationSec: 50 },
+    { task: "Routing iMessage",      taskType: "security", durationSec: 10 },
+    { task: "Standing by",           taskType: "security", durationSec: 50 },
+    { task: "Routing iMessage",      taskType: "security", durationSec: 10 },
   ],
-  researcher: [
-    { task: "Gathering data",       taskType: "research", durationSec: 30 },
-    { task: "Analyzing trends",     taskType: "research", durationSec: 35 },
-    { task: "Building dashboard",   taskType: "coding",   durationSec: 25 },
-    { task: "Coffee break",         taskType: "coffee",   durationSec: 15 },
-    { task: "Writing report",       taskType: "writing",  durationSec: 25 },
+  tunnel: [
+    { task: "Routing traffic",       taskType: "security", durationSec: 60 },
+    { task: "Maintaining tunnel",    taskType: "security", durationSec: 40 },
+    { task: "Routing traffic",       taskType: "security", durationSec: 60 },
   ],
-  strategist: [
-    { task: "Campaign planning",   taskType: "planning", durationSec: 30 },
-    { task: "Market research",     taskType: "research", durationSec: 25 },
-    { task: "Strategy session",    taskType: "planning", durationSec: 25 },
-    { task: "Coffee break",        taskType: "coffee",   durationSec: 15 },
-    { task: "Competitor analysis", taskType: "research", durationSec: 30 },
+  scheduler: [
+    { task: "Waiting for trigger",   taskType: "planning", durationSec: 45 },
+    { task: "Running check-cron",    taskType: "coding",   durationSec: 20 },
+    { task: "Scheduling next run",   taskType: "planning", durationSec: 15 },
+    { task: "Waiting for trigger",   taskType: "planning", durationSec: 45 },
   ],
-  security: [
-    { task: "Security audit",      taskType: "security", durationSec: 35 },
-    { task: "Monitoring logs",     taskType: "security", durationSec: 30 },
-    { task: "Vulnerability scan",  taskType: "security", durationSec: 25 },
-    { task: "Coffee break",        taskType: "coffee",   durationSec: 15 },
-    { task: "Updating firewall",   taskType: "security", durationSec: 30 },
+  approver: [
+    { task: "Reviewing queue",       taskType: "research", durationSec: 35 },
+    { task: "Checking responses",    taskType: "research", durationSec: 25 },
+    { task: "Coffee break",          taskType: "coffee",   durationSec: 15 },
+    { task: "Reviewing queue",       taskType: "research", durationSec: 35 },
+  ],
+  // ── Thoth's machine ──
+  thoth: [
+    { task: "Idle",                  taskType: "idle",     durationSec: 30 },
+    { task: "Reviewing pipeline",    taskType: "planning", durationSec: 20 },
+    { task: "Coffee break",          taskType: "coffee",   durationSec: 15 },
+    { task: "Idle",                  taskType: "idle",     durationSec: 30 },
+  ],
+  scout: [
+    { task: "Awaiting run",          taskType: "idle",     durationSec: 40 },
+    { task: "Scraping Google Maps",  taskType: "research", durationSec: 30 },
+    { task: "Saving leads to DB",    taskType: "coding",   durationSec: 15 },
+    { task: "Awaiting run",          taskType: "idle",     durationSec: 40 },
+  ],
+  qualifier: [
+    { task: "Awaiting run",          taskType: "idle",     durationSec: 40 },
+    { task: "Scoring leads",         taskType: "coding",   durationSec: 30 },
+    { task: "Saving qualified leads",taskType: "coding",   durationSec: 15 },
+    { task: "Awaiting run",          taskType: "idle",     durationSec: 40 },
+  ],
+  hermes: [
+    { task: "Awaiting run",          taskType: "idle",     durationSec: 40 },
+    { task: "Drafting outreach",     taskType: "writing",  durationSec: 30 },
+    { task: "Sending follow-ups",    taskType: "writing",  durationSec: 25 },
+    { task: "Awaiting run",          taskType: "idle",     durationSec: 40 },
+  ],
+  enricher: [
+    { task: "Awaiting run",          taskType: "idle",     durationSec: 40 },
+    { task: "Scraping contact pages",taskType: "research", durationSec: 25 },
+    { task: "Querying Hunter.io",    taskType: "research", durationSec: 20 },
+    { task: "Awaiting run",          taskType: "idle",     durationSec: 40 },
   ],
 };
 
@@ -157,8 +194,15 @@ function detectTaskType(taskName: string): TaskType {
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
+const AGENT_COLORS: Record<string, string> = {
+  athena: "#06b6d4",
+  thoth:  "#f59e0b",
+};
+
 export default function AgentsPage() {
   const [agents, setAgents] = useState<Agent[]>(DEFAULT_AGENTS);
+  const [liveAgentIds, setLiveAgentIds] = useState<Set<string>>(new Set());
+  const [activeTab, setActiveTab] = useState<Machine>("athena");
   const [time, setTime] = useState(new Date());
   const [simulationOn, setSimulationOn] = useState(true);
   const [eventLog, setEventLog] = useState<{ time: string; text: string }[]>([]);
@@ -174,9 +218,8 @@ export default function AgentsPage() {
       return { ...STATIONS };
     }
   });
-  const [editingStation, setEditingStation] = useState<string | null>(null);
-  const [editX, setEditX] = useState('');
-  const [editY, setEditY] = useState('');
+  const [draggingStation, setDraggingStation] = useState<string | null>(null);
+  const roomRef = useRef<HTMLDivElement>(null);
   const simIndexRef = useRef<Record<string, number>>({});
   const taskHistoryRef = useRef<Record<string, Agent['taskHistory']>>({});
 
@@ -186,28 +229,28 @@ export default function AgentsPage() {
     setEventLog((prev) => [{ time: now, text }, ...prev].slice(0, 50));
   }, []);
 
-  // ── Calibration: click-to-edit ──
-  const handleClickStation = useCallback((key: string) => {
-    const c = stationCoords[key];
-    setEditingStation(key);
-    setEditX(String(Math.round(c.x)));
-    setEditY(String(Math.round(c.y)));
-  }, [stationCoords]);
+  const handleDotMouseDown = useCallback((e: React.MouseEvent, key: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDraggingStation(key);
+  }, []);
 
-  const handleSaveCoords = useCallback(() => {
-    if (!editingStation) return;
-    const nx = parseFloat(editX);
-    const ny = parseFloat(editY);
-    if (isNaN(nx) || isNaN(ny) || nx < 0 || nx > 100 || ny < 0 || ny > 100) return;
+  const handleRoomMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!draggingStation || !roomRef.current) return;
+    const rect = roomRef.current.getBoundingClientRect();
+    const x = Math.min(100, Math.max(0, ((e.clientX - rect.left) / rect.width) * 100));
+    const y = Math.min(100, Math.max(0, ((e.clientY - rect.top) / rect.height) * 100));
+    setStationCoords(prev => ({ ...prev, [draggingStation]: { x, y } }));
+  }, [draggingStation]);
+
+  const handleRoomMouseUp = useCallback(() => {
+    if (!draggingStation) return;
     setStationCoords(prev => {
-      const updated = { ...prev, [editingStation]: { x: nx, y: ny } };
-      localStorage.setItem('virtualOfficeStations', JSON.stringify(updated));
-      return updated;
+      localStorage.setItem('virtualOfficeStations', JSON.stringify(prev));
+      return prev;
     });
-    setAgents(prev => prev.map(a => a.station === editingStation ? { ...a } : a));
-    addLog(`Moved ${editingStation} to (${nx}, ${ny})`);
-    setEditingStation(null);
-  }, [editingStation, editX, editY, addLog]);
+    setDraggingStation(null);
+  }, [draggingStation]);
 
   // ── Core API: updateAgent ──
   const updateAgent = useCallback(
@@ -262,6 +305,7 @@ export default function AgentsPage() {
           taskType,
           status: statusForTaskType(taskType),
           station,
+          machine: (agent as any).machine ?? "athena",
           joinedAt: Date.now(),
           taskHistory: taskHistoryRef.current[agent.id],
           totalTokens: 0,
@@ -320,51 +364,86 @@ export default function AgentsPage() {
     return () => clearInterval(t);
   }, []);
 
-  // ── OpenClaw Integration: Poll for real agent data ──
+  // ── Council: Poll for live agent heartbeats ──
   useEffect(() => {
-    const pollOpenClaw = async () => {
+    const pollCouncil = async () => {
       try {
-        const res = await fetch('/api/sessions');
+        const res = await fetch('/api/council/status');
         if (!res.ok) return;
-        const sessions = await res.json();
-        if (!Array.isArray(sessions) || sessions.length === 0) return;
-
-        const colors = ["#06b6d4", "#3b82f6", "#8b5cf6", "#a855f7", "#ec4899", "#f97316"];
-        const occupiedStations = new Set<string>();
-
-        const openClawAgents: Agent[] = sessions.map((session: any, idx: number) => {
-          const taskName = session.current_task || session.task || "Idle";
-          const taskType = detectTaskType(taskName);
-          const station = pickStation(taskType, occupiedStations);
-          occupiedStations.add(station);
-
-          return {
-            id: session.id || session.key || `session-${idx}`,
-            name: session.agent_name || session.name || `Agent ${idx + 1}`,
-            role: session.role || "OpenClaw Agent",
-            status: statusForTaskType(taskType),
-            task: taskName,
-            taskType,
-            color: colors[idx % colors.length],
-            station,
-            joinedAt: Date.now(),
-            taskHistory: [],
-            totalTokens: 0,
-          };
-        });
-
-        if (openClawAgents.length > 0) {
-          setAgents(openClawAgents);
+        const data = await res.json();
+        const liveAgents: any[] = data.agents || [];
+        if (liveAgents.length === 0) {
+          setLiveAgentIds(new Set());
+          return;
         }
+
+        const newLiveIds = new Set<string>(liveAgents.map((a: any) => a.agent_id as string));
+        setLiveAgentIds(newLiveIds);
+
+        liveAgents.forEach((liveAgent: any) => {
+          const agentId = liveAgent.agent_id as string;
+          const taskName = liveAgent.current_task || "Idle";
+          const taskType = (liveAgent.task_type as TaskType) || detectTaskType(taskName);
+
+          setAgents((prev) => {
+            const exists = prev.find((a) => a.id === agentId);
+            const occupiedStations = new Set(prev.filter((a) => a.id !== agentId).map((a) => a.station));
+            const station = exists?.station || pickStation(taskType, occupiedStations);
+
+            // Derive machine: use explicit field, fallback to id prefix
+            const machine: Machine =
+              (liveAgent.machine === "athena" || liveAgent.machine === "thoth")
+                ? liveAgent.machine
+                : agentId.startsWith("thoth") ? "thoth" : "athena";
+
+            const updatedAgent: Agent = {
+              id: agentId,
+              name: liveAgent.agent_name,
+              role: liveAgent.role || "Agent",
+              status: statusForTaskType(taskType),
+              task: taskName,
+              taskType,
+              color: AGENT_COLORS[agentId] || "#06b6d4",
+              station,
+              machine,
+              joinedAt: exists?.joinedAt || Date.now(),
+              taskHistory: exists?.taskHistory || [],
+              totalTokens: liveAgent.metadata?.tokens_used || 0,
+            };
+
+            if (!exists) {
+              addLog(`${updatedAgent.name} is LIVE`);
+              return [...prev, updatedAgent];
+            }
+
+            // Only update task/station if task changed
+            if (exists.task !== taskName) {
+              addLog(`${updatedAgent.name} → ${taskName}`);
+              const shouldMove = exists.taskType !== taskType;
+              return prev.map((a) =>
+                a.id !== agentId ? a : {
+                  ...a,
+                  task: taskName,
+                  taskType,
+                  status: updatedAgent.status,
+                  station: shouldMove ? pickStation(taskType, new Set(prev.filter((x) => x.id !== agentId).map((x) => x.station))) : a.station,
+                  totalTokens: updatedAgent.totalTokens,
+                }
+              );
+            }
+
+            return prev.map((a) => a.id !== agentId ? a : { ...a, totalTokens: updatedAgent.totalTokens });
+          });
+        });
       } catch {
-        // Silently fail — keep existing agents
+        // Silently fail
       }
     };
 
-    const interval = setInterval(pollOpenClaw, 15000);
-    pollOpenClaw();
+    const interval = setInterval(pollCouncil, 10000);
+    pollCouncil();
     return () => clearInterval(interval);
-  }, []);
+  }, [addLog]);
 
   // ── Demo Simulation ──
   useEffect(() => {
@@ -394,16 +473,21 @@ export default function AgentsPage() {
     return () => timers.forEach(clearTimeout);
   }, [simulationOn, updateAgent]);
 
-  // ── Derived counts ──
-  const activeCount = agents.filter((a) => a.status === "active").length;
-  const chattingCount = agents.filter((a) => a.status === "chatting").length;
-  const idleCount = agents.filter((a) => a.status === "idle").length;
+  // ── Derived: filter by active tab ──
+  const visibleAgents = agents.filter((a) => a.machine === activeTab);
+  const activeCount = visibleAgents.filter((a) => a.status === "active").length;
+  const chattingCount = visibleAgents.filter((a) => a.status === "chatting").length;
+  const idleCount = visibleAgents.filter((a) => a.status === "idle").length;
+  const tabLiveCount = (tab: Machine) => Array.from(liveAgentIds).filter((id) => {
+    const agent = agents.find((a) => a.id === id);
+    return agent?.machine === tab;
+  }).length;
 
   return (
     <div className="space-y-4 animate-fade-in">
       {/* Title Bar */}
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-white">Virtual Office</h1>
+        <h1 className="text-xl font-semibold text-white">Council</h1>
         <div className="flex items-center gap-4">
           <button
             onClick={() => setCalibrationMode(!calibrationMode)}
@@ -433,16 +517,51 @@ export default function AgentsPage() {
         </div>
       </div>
 
-      {/* API Connection Info */}
-      {!simulationOn && (
-        <div className="p-3 bg-cyan-500/10 border border-cyan-500/30 rounded-lg text-cyan-300 text-xs">
-          <strong>API Mode:</strong> Simulation is off. Agents will only move when updated via{" "}
-          <code className="bg-[#1A1A2E] px-1 py-0.5 rounded text-cyan-200">window.VirtualOffice.updateAgent(id, {"{"} task, taskType {"}"})</code>.
-        </div>
-      )}
+      {/* Machine Tabs */}
+      <div className="flex gap-2">
+        {(["athena", "thoth"] as Machine[]).map((tab) => {
+          const isActive = activeTab === tab;
+          const liveCount = tabLiveCount(tab);
+          const tabColor = tab === "athena" ? "#06b6d4" : "#f59e0b";
+          return (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                isActive
+                  ? "text-white"
+                  : "bg-[#1A1A2E] text-gray-400 hover:text-white border border-[#2A2A3E]"
+              }`}
+              style={isActive ? { background: `${tabColor}22`, border: `1px solid ${tabColor}55`, color: tabColor } : {}}
+            >
+              <div
+                className="w-2.5 h-2.5 rounded-full"
+                style={{
+                  background: liveCount > 0 ? "#22c55e" : tabColor,
+                  boxShadow: liveCount > 0 ? "0 0 6px #22c55e88" : "none",
+                  animation: liveCount > 0 ? "pulse 2s infinite" : "none",
+                }}
+              />
+              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              {liveCount > 0 && (
+                <span className="bg-green-500/20 text-green-400 text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-green-500/30">
+                  {liveCount} LIVE
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
 
       {/* 3D Isometric Room — Pure percentage positioning */}
-      <div className="relative w-full rounded-xl overflow-hidden shadow-2xl bg-[#8ecfcf]">
+      <div
+        ref={roomRef}
+        className="relative w-full rounded-xl overflow-hidden shadow-2xl bg-[#8ecfcf]"
+        onMouseMove={handleRoomMouseMove}
+        onMouseUp={handleRoomMouseUp}
+        onMouseLeave={handleRoomMouseUp}
+        style={{ userSelect: draggingStation ? 'none' : undefined }}
+      >
         <img
           src={ROOM_BG}
           alt="Virtual Office Room"
@@ -528,74 +647,26 @@ export default function AgentsPage() {
             {Object.entries(stationCoords).map(([key, st]) => (
               <div
                 key={key}
-                onClick={() => handleClickStation(key)}
-                className="absolute w-5 h-5 rounded-full bg-yellow-400 border-2 border-yellow-600 pointer-events-auto cursor-pointer hover:bg-yellow-300 hover:scale-125 transition-transform"
+                onMouseDown={(e) => handleDotMouseDown(e, key)}
+                className="absolute pointer-events-auto cursor-grab active:cursor-grabbing"
                 style={{
                   left: `${st.x}%`,
                   top: `${st.y}%`,
                   transform: "translate(-50%, -50%)",
-                  zIndex: 200,
+                  zIndex: draggingStation === key ? 300 : 200,
                 }}
               >
-                <span className="absolute top-6 left-1/2 -translate-x-1/2 text-[7px] text-yellow-300 bg-black/80 px-1 rounded whitespace-nowrap">
+                <div className={`w-5 h-5 rounded-full border-2 transition-colors ${draggingStation === key ? 'bg-yellow-200 border-yellow-400 scale-125' : 'bg-yellow-400 border-yellow-600 hover:bg-yellow-300'}`} />
+                <span className="absolute top-6 left-1/2 -translate-x-1/2 text-[7px] text-yellow-300 bg-black/80 px-1 rounded whitespace-nowrap pointer-events-none">
                   {key} ({Math.round(st.x)},{Math.round(st.y)})
                 </span>
               </div>
             ))}
-
-            {editingStation && stationCoords[editingStation] && (
-              <div
-                className="absolute pointer-events-auto z-[300]"
-                style={{
-                  left: `${stationCoords[editingStation].x}%`,
-                  top: `${stationCoords[editingStation].y}%`,
-                  transform: "translate(-50%, -130%)",
-                }}
-              >
-                <div className="bg-[#1A1A2E] border border-yellow-500/50 rounded-lg p-3 shadow-xl min-w-[180px]">
-                  <div className="text-yellow-400 text-xs font-bold mb-2">{editingStation}</div>
-                  <div className="flex gap-2 items-center mb-2">
-                    <label className="text-[10px] text-gray-400 w-4">X</label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={editX}
-                      onChange={(e) => setEditX(e.target.value)}
-                      className="w-16 bg-[#2A2A3E] border border-gray-600 rounded px-2 py-1 text-xs text-white focus:border-yellow-400 outline-none"
-                    />
-                    <label className="text-[10px] text-gray-400 w-4">Y</label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={editY}
-                      onChange={(e) => setEditY(e.target.value)}
-                      className="w-16 bg-[#2A2A3E] border border-gray-600 rounded px-2 py-1 text-xs text-white focus:border-yellow-400 outline-none"
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handleSaveCoords}
-                      className="flex-1 bg-yellow-500 hover:bg-yellow-400 text-black text-xs font-bold py-1 rounded transition-colors"
-                    >
-                      Save
-                    </button>
-                    <button
-                      onClick={() => setEditingStation(null)}
-                      className="flex-1 bg-gray-600 hover:bg-gray-500 text-white text-xs py-1 rounded transition-colors"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         )}
 
         {/* Agent Avatars — positioned with pure CSS percentages */}
-        {agents.map((agent) => {
+        {visibleAgents.map((agent) => {
           const stationPos = stationCoords[agent.station];
           if (!stationPos) return null;
           const statusColor =
@@ -641,8 +712,10 @@ export default function AgentsPage() {
                 className="relative w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-xl hover:scale-110 transition-transform cursor-pointer"
                 style={{
                   background: `radial-gradient(circle at 35% 35%, ${agent.color}dd, ${agent.color})`,
-                  border: `3px solid ${agent.color}`,
-                  boxShadow: `0 0 14px ${agent.color}66, 0 4px 12px rgba(0,0,0,0.3)`,
+                  border: liveAgentIds.has(agent.id) ? `3px solid #22c55e` : `3px solid ${agent.color}`,
+                  boxShadow: liveAgentIds.has(agent.id)
+                    ? `0 0 18px #22c55e88, 0 4px 12px rgba(0,0,0,0.3)`
+                    : `0 0 14px ${agent.color}66, 0 4px 12px rgba(0,0,0,0.3)`,
                 }}
               >
                 {agent.name.charAt(0)}
@@ -650,6 +723,11 @@ export default function AgentsPage() {
                   className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white"
                   style={{ background: statusColor }}
                 />
+                {liveAgentIds.has(agent.id) && (
+                  <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-green-500 text-white text-[7px] font-bold px-1 rounded-full whitespace-nowrap">
+                    LIVE
+                  </div>
+                )}
               </div>
 
               {/* Name Tag */}
@@ -666,6 +744,12 @@ export default function AgentsPage() {
 
       {/* Status Bar */}
       <div className="flex items-center justify-center gap-8 bg-[#1A1A2E] border border-[#2A2A3E] rounded-lg px-6 py-3">
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse" />
+          <span className="text-white font-semibold text-sm">{tabLiveCount(activeTab)}</span>
+          <span className="text-green-400 text-sm font-medium">Live</span>
+        </div>
+        <div className="w-px h-4 bg-[#2A2A3E]" />
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.5)]" />
           <span className="text-white font-semibold text-sm">{activeCount}</span>
@@ -687,16 +771,19 @@ export default function AgentsPage() {
       <div className="grid grid-cols-12 gap-4">
         {/* Agent Cards */}
         <div className="col-span-8 grid grid-cols-3 gap-3">
-          {agents.map((agent) => {
+          {visibleAgents.map((agent) => {
             const statusColor =
               agent.status === "active" ? "#06b6d4" :
               agent.status === "chatting" ? "#a855f7" :
               "#6b7280";
             return (
-              <div key={agent.id} className="bg-[#1A1A2E] border border-[#2A2A3E] rounded-lg p-3">
+              <div key={agent.id} className={`bg-[#1A1A2E] border rounded-lg p-3 ${liveAgentIds.has(agent.id) ? 'border-green-500/40' : 'border-[#2A2A3E]'}`}>
                 <div className="flex items-center gap-2 mb-1">
                   <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: statusColor, boxShadow: `0 0 6px ${statusColor}88` }} />
                   <span className="text-white text-sm font-semibold">{agent.name}</span>
+                  {liveAgentIds.has(agent.id) && (
+                    <span className="ml-auto bg-green-500/20 text-green-400 text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-green-500/30">LIVE</span>
+                  )}
                 </div>
                 <div className="text-gray-500 text-xs">{agent.role}</div>
                 <div className="text-gray-400 text-[10px] mt-1 truncate">{agent.task}</div>

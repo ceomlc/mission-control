@@ -19,6 +19,16 @@ export async function GET() {
       // ----------------------------------------------------------------
       const { rows: [s] } = await client.query(`
         SELECT
+          -- Raw activity counts
+          -- messages_sent: iMessage confirmed (delivery-receipt callback received)
+          COUNT(*) FILTER (WHERE status = 'sent' AND variant::text LIKE 'script_%')::int                          AS messages_sent,
+          -- relay_accepted: relay received, pending iMessage confirmation
+          COUNT(*) FILTER (WHERE status = 'approved' AND variant::text LIKE 'script_%')::int                      AS relay_pending,
+          COUNT(*) FILTER (WHERE status = 'pending_approval')::int                                                 AS queue_depth,
+          COUNT(*) FILTER (WHERE sequence_day >= 1 AND variant::text LIKE 'script_%'
+            AND status NOT IN ('pending_approval','bad_data'))::int                                                AS in_sequence,
+          COUNT(*) FILTER (WHERE status IN ${REPLIED_STATUSES})::int                                               AS total_replied,
+
           -- leads_contacted: all leads that have left pending_approval
           COUNT(*) FILTER (WHERE status != 'pending_approval')::int                                                AS leads_contacted,
 
@@ -27,7 +37,6 @@ export async function GET() {
           COUNT(*) FILTER (WHERE sequence_day = 1 AND status IN ${REPLIED_STATUSES})::int                          AS touch1_replied,
 
           -- YES rate: response contains "yes" (or status=hot) / total replied
-          COUNT(*) FILTER (WHERE status IN ${REPLIED_STATUSES})::int                                               AS total_replied,
           COUNT(*) FILTER (WHERE status IN ${REPLIED_STATUSES}
             AND (response_text ILIKE '%yes%' OR status = 'hot'))::int                                              AS yes_count,
 
@@ -50,6 +59,13 @@ export async function GET() {
       `);
 
       const summary = {
+        // Raw counts
+        messages_sent:        s.messages_sent,
+        relay_pending:        s.relay_pending,
+        queue_depth:          s.queue_depth,
+        in_sequence:          s.in_sequence,
+        total_replied:        s.total_replied,
+        // Rate metrics
         touch1_reply_rate:    safe(s.touch1_replied,  s.touch1_total),
         yes_rate:             safe(s.yes_count,        s.total_replied),
         loom_reply_rate:      safe(s.t3_replied,       s.looms_sent),
@@ -60,42 +76,32 @@ export async function GET() {
       };
 
       // ----------------------------------------------------------------
-      // A/B splits — grouped by variant + trade
-      // Also includes send_day and send_time_window breakdowns
-      // Minimum 50 leads per split before flagging as valid
+      // A/B splits — grouped by variant only
+      // send_day/time_window breakdowns unlock at 50+ sends per variant
       // ----------------------------------------------------------------
       const { rows: splitRows } = await client.query(`
         SELECT
           COALESCE(variant::text, 'unassigned')               AS variant,
-          COALESCE(trade, 'unassigned')                        AS trade,
-          TO_CHAR(message_sent_date, 'Day')                    AS send_day,
-          CASE
-            WHEN EXTRACT(HOUR FROM last_contact) BETWEEN 6  AND 11 THEN 'morning'
-            WHEN EXTRACT(HOUR FROM last_contact) BETWEEN 12 AND 16 THEN 'afternoon'
-            WHEN EXTRACT(HOUR FROM last_contact) BETWEEN 17 AND 20 THEN 'evening'
-            ELSE 'other'
-          END                                                  AS send_time_window,
-          COUNT(*)::int                                        AS sends,
-          COUNT(*) FILTER (WHERE status IN ${REPLIED_STATUSES})::int   AS replies,
+          COUNT(*) FILTER (WHERE variant::text LIKE 'script_%')::int  AS sends,
+          COUNT(*) FILTER (WHERE status IN ${REPLIED_STATUSES})::int  AS replies,
           COUNT(*) FILTER (WHERE status IN ${REPLIED_STATUSES}
-            AND (response_text ILIKE '%yes%' OR status = 'hot'))::int  AS yes_count
+            AND (response_text ILIKE '%yes%' OR status = 'hot'))::int AS yes_count
         FROM leads
-        WHERE status != 'pending_approval'
-          AND variant IS NOT NULL
-          AND trade IS NOT NULL
-        GROUP BY variant, trade, send_day, send_time_window
-        ORDER BY variant, trade, sends DESC
+        WHERE variant::text LIKE 'script_%'
+          AND status != 'pending_approval'
+        GROUP BY variant
+        ORDER BY variant
       `);
 
       const splits = splitRows.map((row) => ({
         variant:          row.variant,
-        trade:            row.trade,
-        send_day:         row.send_day?.trim() ?? null,
-        send_time_window: row.send_time_window,
+        trade:            'all',
+        send_day:         null,
+        send_time_window: null,
         sends:            row.sends,
         reply_rate:       safe(row.replies,    row.sends),
         yes_rate:         safe(row.yes_count,  row.replies),
-        sample_status:    row.sends >= 50 ? 'sufficient' : 'insufficient_data',
+        sample_status:    row.sends >= 30 ? 'sufficient' : 'insufficient_data',
       }));
 
       return NextResponse.json({ summary, splits });

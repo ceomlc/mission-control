@@ -5,6 +5,13 @@ import { useState, useEffect } from 'react';
 // ---- Types ----------------------------------------------------------------
 
 interface KPISummary {
+  // Raw counts
+  messages_sent: number;
+  relay_pending: number;
+  queue_depth: number;
+  in_sequence: number;
+  total_replied: number;
+  // Rate metrics
   touch1_reply_rate: number;
   yes_rate: number;
   loom_reply_rate: number;
@@ -157,6 +164,11 @@ export default function KPIPage() {
   }
 
   const summary = kpiData?.summary ?? {
+    messages_sent: 0,
+    relay_pending: 0,
+    queue_depth: 0,
+    in_sequence: 0,
+    total_replied: 0,
     touch1_reply_rate: 0,
     yes_rate: 0,
     loom_reply_rate: 0,
@@ -180,6 +192,31 @@ export default function KPIPage() {
   return (
     <div className="space-y-8" style={{ color: 'white' }}>
       <h1 className="text-2xl font-bold text-white">KPI Dashboard</h1>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Activity counters — raw pipeline numbers                           */}
+      {/* ------------------------------------------------------------------ */}
+      <section>
+        <h2 className="text-lg font-semibold mb-3" style={{ color: '#E8E0D0' }}>Outreach Activity</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          {[
+            { label: 'iMessage Confirmed', value: summary.messages_sent,  icon: '✅', color: '#22c55e', tooltip: 'Delivery confirmed by Athena relay' },
+            { label: 'Relay Pending',      value: summary.relay_pending,   icon: '📡', color: '#f97316', tooltip: 'Sent to relay, awaiting iMessage confirmation' },
+            { label: 'Replied',            value: summary.total_replied,   icon: '💬', color: '#a855f7', tooltip: null },
+            { label: 'Pending Queue',      value: summary.queue_depth,     icon: '⏳', color: '#f59e0b', tooltip: null },
+          ].map(({ label, value, icon, color }) => (
+            <div
+              key={label}
+              className="rounded-xl p-4 flex flex-col gap-1"
+              style={{ background: '#1A1A2E', border: `1px solid ${color}40` }}
+            >
+              <span className="text-2xl">{icon}</span>
+              <span className="text-3xl font-bold" style={{ color }}>{value}</span>
+              <span className="text-xs" style={{ color: '#E8E0D0' }}>{label}</span>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* ------------------------------------------------------------------ */}
       {/* STEP 4 — Summary bar: 7 KPI cards                                  */}

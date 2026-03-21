@@ -35,18 +35,10 @@ export async function POST(request: Request) {
 
     // Validate phone and message exist
     if (!lead.phone) {
-      await pool.query(
-        "UPDATE leads SET status = 'failed' WHERE id = $1",
-        [lead_id]
-      );
       return NextResponse.json({ error: 'Lead has no phone number' }, { status: 400 });
     }
 
     if (!lead.message_drafted) {
-      await pool.query(
-        "UPDATE leads SET status = 'failed' WHERE id = $1",
-        [lead_id]
-      );
       return NextResponse.json({ error: 'Lead has no drafted message' }, { status: 400 });
     }
 
@@ -68,10 +60,7 @@ export async function POST(request: Request) {
 
       relayResult = await response.json();
     } catch (fetchError: any) {
-      await pool.query(
-        "UPDATE leads SET status = 'failed' WHERE id = $1",
-        [lead_id]
-      );
+      // Relay unreachable — leave as pending_approval so it stays in queue
       return NextResponse.json(
         { error: 'Failed to connect to iMessage relay server', details: fetchError.message },
         { status: 500 }
@@ -80,11 +69,11 @@ export async function POST(request: Request) {
 
     // Update lead based on result
     if (relayResult.success) {
+      // Mark as 'approved' = relay accepted, pending iMessage delivery confirmation.
+      // Athena's relay will call /api/leads/delivery-receipt to confirm actual delivery,
+      // at which point status moves to 'sent' and counts in KPI.
       await pool.query(
-        `UPDATE leads SET 
-          status = 'sent', 
-          message_sent_date = CURRENT_TIMESTAMP
-        WHERE id = $1`,
+        `UPDATE leads SET status = 'approved', updated_at = NOW() WHERE id = $1`,
         [lead_id]
       );
 
@@ -93,14 +82,15 @@ export async function POST(request: Request) {
         lead_id,
         recipient: lead.phone,
         timestamp: relayResult.timestamp,
-        message: 'iMessage sent successfully'
+        message: 'iMessage handed to relay — awaiting delivery confirmation'
       });
     } else {
-      // Send failed
+      // Relay rejected — leave as pending_approval so it stays in queue
       const errorMsg = relayResult.error || 'Unknown error';
+      const note = `[Relay error: ${errorMsg}]`;
       await pool.query(
-        "UPDATE leads SET status = 'failed' WHERE id = $1",
-        [lead_id]
+        `UPDATE leads SET notes = COALESCE(notes || ' ', '') || $2, updated_at = NOW() WHERE id = $1`,
+        [lead_id, note]
       );
 
       return NextResponse.json({

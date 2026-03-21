@@ -9,11 +9,11 @@ export async function GET(request: Request) {
   
   try {
     let query = 'SELECT * FROM jobs ORDER BY created_at DESC LIMIT $1';
-    const params: any[] = [limit];
+    let params: any[] = [limit];
     
     if (status) {
       query = 'SELECT * FROM jobs WHERE status = $1 ORDER BY created_at DESC LIMIT $2';
-      params.push(limit);
+      params = [status, limit];
     }
     
     const result = await pool.query(query, params);
