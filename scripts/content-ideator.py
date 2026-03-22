@@ -71,7 +71,7 @@ MISSION_CONTROL_URL = os.environ.get(
     "MISSION_CONTROL_URL", "https://mission-control-app-theta.vercel.app"
 ).rstrip("/")
 
-CLAUDE_MODEL = "claude-3-5-haiku-20241022"
+CLAUDE_MODEL = "claude-haiku-4-5"
 
 OBSIDIAN_VAULT_BASE = Path.home() / "obsidian-vault" / "Content"
 
