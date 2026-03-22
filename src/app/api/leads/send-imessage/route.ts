@@ -47,22 +47,38 @@ export async function POST(request: Request) {
     try {
       console.log('[iMessage Relay] URL:', IMessageRelayUrl);
       console.log('[iMessage Relay] Payload:', { recipient: lead.phone, message: lead.message_drafted });
-      
-      const response = await fetch(IMessageRelayUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          recipient: lead.phone,
-          message: lead.message_drafted
-        }),
-        signal: AbortSignal.timeout(30000) // 30 second timeout
-      });
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+      let response;
+      try {
+        response = await fetch(IMessageRelayUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            recipient: lead.phone,
+            message: lead.message_drafted
+          }),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       relayResult = await response.json();
     } catch (fetchError: any) {
       // Relay unreachable — leave as pending_approval so it stays in queue
       return NextResponse.json(
         { error: 'Failed to connect to iMessage relay server', details: fetchError.message },
+        { status: 500 }
+      );
+    }
+
+    // Guard against null/undefined relay response
+    if (!relayResult) {
+      return NextResponse.json(
+        { error: 'iMessage relay returned an empty response' },
         { status: 500 }
       );
     }

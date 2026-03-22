@@ -75,25 +75,53 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   const body = await request.json();
   const { id, ...updates } = body;
-  
+
+  if (!id) {
+    return NextResponse.json({ error: 'id is required' }, { status: 400 });
+  }
+
+  const ALLOWED_COLUMNS = new Set([
+    'status', 'notes', 'phone', 'company_name', 'industry',
+    'first_name', 'variant', 'sequence_day', 'message_sent_date',
+    'response_text', 'loom_url', 'call_outcome', 'updated_at',
+    'message_drafted', 'message_sent',
+  ]);
+
   try {
     const setClauses: string[] = [];
     const values: any[] = [];
     let paramIndex = 1;
-    
+
     for (const [key, value] of Object.entries(updates)) {
+      if (!ALLOWED_COLUMNS.has(key)) continue;
       setClauses.push(`${key} = $${paramIndex}`);
       values.push(value);
       paramIndex++;
     }
-    
+
+    if (setClauses.length === 0) {
+      return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
+    }
+
     values.push(id);
-    
+
     const result = await pool.query(
       `UPDATE leads SET ${setClauses.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = $${paramIndex} RETURNING *`,
       values
     );
     return NextResponse.json(result.rows[0]);
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const body = await request.json();
+    const { id } = body;
+    if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
+    await pool.query('DELETE FROM leads WHERE id = $1', [id]);
+    return NextResponse.json({ ok: true, deleted: id });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

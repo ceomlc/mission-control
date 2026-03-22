@@ -26,13 +26,21 @@ export async function GET(request: Request) {
       params.push(batchDate);
       conditions.push(`batch_date = $${params.length}`);
     }
-    
+
     if (conditions.length > 0) {
       query += ' WHERE ' + conditions.join(' AND ');
     }
-    
+
     query += ' ORDER BY created_at DESC';
-    
+
+    const limitParam = searchParams.get('limit');
+    if (limitParam) {
+      const limitVal = parseInt(limitParam, 10);
+      if (!isNaN(limitVal) && limitVal > 0) {
+        query += ` LIMIT ${limitVal}`;
+      }
+    }
+
     const result = await pool.query(query, params);
     return NextResponse.json({ leads: result.rows });
   } catch (error: any) {

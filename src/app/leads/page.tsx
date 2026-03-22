@@ -58,6 +58,12 @@ export default function LeadsPage() {
   const [savingField, setSavingField] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
   const [editingMessageText, setEditingMessageText] = useState('');
+  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+
+  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3000);
+  };
 
   useEffect(() => {
     fetchLeads();
@@ -179,13 +185,13 @@ export default function LeadsPage() {
       });
       const data = await res.json();
       if (data.success) {
-        alert(`Moved ${data.leadsMoved} leads to Outreach Queue!\n\nRemaining today: ${data.remainingSlots}`);
+        showToast(`Moved ${data.leadsMoved} leads to Outreach Queue! Remaining today: ${data.remainingSlots}`, 'success');
       } else {
-        alert(data.error || 'Failed to prepare leads');
+        showToast(data.error || 'Failed to prepare leads', 'error');
       }
       fetchLeads();
     } catch (error) {
-      alert('Prepare failed: ' + error);
+      showToast('Prepare failed: ' + error, 'error');
     } finally {
       setPreparingSend(false);
     }
@@ -202,12 +208,12 @@ export default function LeadsPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        alert(`Failed to reject: ${data.error || 'Unknown error'}`);
+        showToast(`Failed to reject: ${data.error || 'Unknown error'}`, 'error');
         return;
       }
       fetchLeads();
     } catch (err) {
-      alert('Reject failed: ' + err);
+      showToast('Reject failed: ' + err, 'error');
     }
   };
 
@@ -221,14 +227,14 @@ export default function LeadsPage() {
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        alert(`✅ iMessage sent to ${lead.company_name}!`);
+        showToast(`iMessage sent to ${lead.company_name}!`, 'success');
       } else {
-        alert(`❌ Send failed: ${data.error || 'Unknown error'}`);
+        showToast(`Send failed: ${data.error || 'Unknown error'}`, 'error');
       }
       fetchLeads();
     } catch (error) {
       console.error('Send error', error);
-      alert('Send failed: ' + error);
+      showToast('Send failed: ' + error, 'error');
     } finally {
       setSendingLeadId(null);
     }
@@ -243,10 +249,10 @@ export default function LeadsPage() {
         body: JSON.stringify({ limit: 10 }),
       });
       const data = await res.json();
-      alert(`Research complete! Added ${data.added} new leads.`);
+      showToast(`Research complete! Added ${data.added} new leads.`, 'success');
       fetchLeads();
     } catch (error) {
-      alert('Research failed: ' + error);
+      showToast('Research failed: ' + error, 'error');
     } finally {
       setResearching(false);
     }
@@ -258,10 +264,10 @@ export default function LeadsPage() {
     try {
       const res = await fetch('/api/leads/generate-all', { method: 'POST' });
       const data = await res.json();
-      alert(`Generated messages for ${data.generated} leads!`);
+      showToast(`Generated messages for ${data.generated} leads!`, 'success');
       fetchLeads();
     } catch (error) {
-      alert('Generation failed: ' + error);
+      showToast('Generation failed: ' + error, 'error');
     } finally {
       setGeneratingAll(false);
     }
@@ -270,20 +276,20 @@ export default function LeadsPage() {
   const handleCheckResponses = async () => {
     setCheckingResponses(true);
     try {
-      const res = await fetch('/api/leads/check-responses', { 
+      const res = await fetch('/api/leads/check-responses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ limit: 50 }),
       });
       const data = await res.json();
       if (data.respondedCount > 0) {
-        alert(`Found ${data.respondedCount} responses!\n\n${data.responses.map((r: any) => `${r.company}: ${r.lastMessage?.substring(0, 50)}...`).join('\n')}`);
+        showToast(`Found ${data.respondedCount} responses!`, 'success');
       } else {
-        alert(`Checked ${data.checked} leads. No responses yet.`);
+        showToast(`Checked ${data.checked} leads. No responses yet.`, 'success');
       }
       fetchLeads();
     } catch (error) {
-      alert('Check failed: ' + error);
+      showToast('Check failed: ' + error, 'error');
     } finally {
       setCheckingResponses(false);
     }
@@ -294,7 +300,7 @@ export default function LeadsPage() {
   return (
     <div className="min-h-screen bg-[#0A0A0F] p-6">
       <div className="max-w-full mx-auto">
-        
+
         {/* OUTREACH QUEUE SECTION */}
         {outreachLeads.length > 0 && (
           <div className="mb-8">
@@ -308,8 +314,8 @@ export default function LeadsPage() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {outreachLeads.map((lead) => (
-                <div 
-                  key={lead.id} 
+                <div
+                  key={lead.id}
                   className={`bg-[#1A1A2E] rounded-xl border p-4 ${lead.status === 'failed' ? 'border-red-500/50' : 'border-orange-500/30'}`}
                 >
                   <div className="flex justify-between items-start mb-2">
@@ -377,7 +383,7 @@ export default function LeadsPage() {
                       </button>
                     ) : (
                       <button
-                        onClick={() => { console.log('Button clicked for lead', lead.id); handleSendIMessage(lead); }}
+                        onClick={() => handleSendIMessage(lead)}
                         disabled={sendingLeadId === lead.id}
                         className="flex-1 py-2 px-3 bg-green-600 text-white text-xs rounded-lg hover:bg-green-500 font-medium disabled:opacity-50"
                       >
@@ -443,7 +449,7 @@ export default function LeadsPage() {
               key={status}
               onClick={() => setFilter(status)}
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${
-                filter === status 
+                filter === status
                   ? 'bg-[#DC143C] text-white'
                   : 'bg-[#1A1A2E] text-gray-400 hover:bg-[#2A2A3E]'
               }`}
@@ -538,7 +544,7 @@ export default function LeadsPage() {
                               body: JSON.stringify({ id: lead.id, status: 'pending_approval' }),
                             });
                             fetchLeads();
-                            alert('Moved back to Outreach Queue!');
+                            showToast('Moved back to Outreach Queue!', 'success');
                           }}
                           className="px-3 py-1 bg-orange-600 text-white text-xs rounded hover:bg-orange-500"
                         >
@@ -590,7 +596,7 @@ export default function LeadsPage() {
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
           <div className="bg-[#1A1A2E] rounded-2xl max-w-lg w-full p-6 border border-[#2A2A3E]">
             <h2 className="text-xl font-bold mb-4 text-white">{selectedLead.company_name}</h2>
-            
+
             <div className="space-y-3 mb-4 text-sm">
               <div className="grid grid-cols-2 gap-2">
                 {selectedLead.first_name && <div><span className="text-gray-500">Owner:</span> <span className="text-white">{selectedLead.first_name}</span></div>}
@@ -731,7 +737,7 @@ export default function LeadsPage() {
                     });
                     fetchLeads();
                     setSelectedLead(null);
-                    alert('Moved to Outreach Queue!');
+                    showToast('Moved to Outreach Queue!', 'success');
                   }}
                   className="flex-1 py-2 px-4 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-medium"
                 >
@@ -740,6 +746,17 @@ export default function LeadsPage() {
               ) : null}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Toast notification */}
+      {toast && (
+        <div
+          className={`fixed bottom-6 right-6 z-[100] px-4 py-3 rounded-lg shadow-lg text-white text-sm font-medium transition-all ${
+            toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+          }`}
+        >
+          {toast.msg}
         </div>
       )}
     </div>

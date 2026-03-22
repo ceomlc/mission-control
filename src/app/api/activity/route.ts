@@ -1,40 +1,61 @@
 export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
-
-// Mock activity for demo
-const mockActivity = [
-  {
-    id: '1',
-    type: 'cron',
-    message: 'Morning Brief completed',
-    timestamp: Date.now() - 3600000,
-    status: 'success'
-  },
-  {
-    id: '2',
-    type: 'session',
-    message: 'Main session started',
-    timestamp: Date.now() - 7200000,
-    status: 'success'
-  },
-  {
-    id: '3',
-    type: 'build',
-    message: 'Website built: joes-plumbing-theta.vercel.app',
-    timestamp: Date.now() - 86400000,
-    status: 'success'
-  },
-  {
-    id: '4',
-    type: 'cron',
-    message: 'Daily Research Report delivered',
-    timestamp: Date.now() - 28800000,
-    status: 'success'
-  }
-];
+import pool from '@/lib/db';
 
 export async function GET() {
-  // In production, this would fetch from gateway
-  // For now, return mock data
-  return NextResponse.json(mockActivity);
+  try {
+    const result = await pool.query(`
+      SELECT type, description, timestamp, meta
+      FROM (
+        SELECT
+          'lead' AS type,
+          company_name || ' — ' || status AS description,
+          updated_at AS timestamp,
+          status AS meta
+        FROM leads
+        WHERE updated_at > NOW() - INTERVAL '7 days'
+        ORDER BY updated_at DESC
+        LIMIT 10
+      ) leads_activity
+
+      UNION ALL
+
+      SELECT
+        type, description, timestamp, meta
+      FROM (
+        SELECT
+          'job' AS type,
+          job_title || ' @ ' || company_name AS description,
+          updated_at AS timestamp,
+          status AS meta
+        FROM jobs
+        WHERE updated_at > NOW() - INTERVAL '7 days'
+        ORDER BY updated_at DESC
+        LIMIT 10
+      ) jobs_activity
+
+      UNION ALL
+
+      SELECT
+        type, description, timestamp, meta
+      FROM (
+        SELECT
+          'content' AS type,
+          title || ' [' || status || ']' AS description,
+          updated_at AS timestamp,
+          status AS meta
+        FROM content_ideas
+        WHERE updated_at > NOW() - INTERVAL '7 days'
+        ORDER BY updated_at DESC
+        LIMIT 10
+      ) content_activity
+
+      ORDER BY timestamp DESC
+      LIMIT 25
+    `);
+
+    return NextResponse.json(result.rows);
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 }

@@ -136,14 +136,18 @@ export default function LeadsPage() {
                     </td>
                     {(activeTab === 'qualified' || activeTab === 'discarded') && (
                       <td className="px-4 py-3">
-                        {lead.score && (
-                          <span className="mr-2">{lead.score}/10</span>
-                        )}
-                        {lead.tier && (
-                          <span className={`px-2 py-0.5 rounded-full text-xs ${getTierBadge(lead.tier)}`}>
-                            {lead.tier}
-                          </span>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {lead.tier && (
+                            <span className={`px-2 py-0.5 rounded-full text-xs ${getTierBadge(lead.tier)}`}>
+                              {lead.tier}
+                            </span>
+                          )}
+                          {lead.score != null && lead.score > 0 ? (
+                            <span className="text-gray-400 text-xs">{lead.score}/10</span>
+                          ) : (
+                            <span className="text-gray-600 text-xs">—</span>
+                          )}
+                        </div>
                       </td>
                     )}
                     <td className="px-4 py-3 text-gray-500">

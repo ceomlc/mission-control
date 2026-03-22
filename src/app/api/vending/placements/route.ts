@@ -44,9 +44,9 @@ export async function POST(request: Request) {
       [lead_id, meeting_date, location_details, agreement_summary, notes]
     );
     
-    // Update the outreach status to closed_won
+    // Update outreach status to 'interested' — pipeline stage, not yet closed
     await pool.query(
-      "UPDATE vending_outreach SET status = 'closed_won', updated_at = NOW() WHERE lead_id = $1",
+      "UPDATE vending_outreach SET status = 'interested', updated_at = NOW() WHERE lead_id = $1",
       [lead_id]
     );
     

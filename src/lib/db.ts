@@ -5,7 +5,7 @@ const pool = new Pool({
   port: 5432,
   database: 'leads_production',
   user: 'athena',
-  password: 'AthenaPass2026!',
+  password: 'Athena2026',
   ssl: { rejectUnauthorized: false },
 });
 

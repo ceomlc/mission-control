@@ -3,11 +3,10 @@
 import { useEffect, useState } from 'react';
 
 interface Activity {
-  id: string;
-  type: 'cron' | 'session' | 'build' | 'message';
-  message: string;
-  timestamp: number;
-  status: string;
+  type: 'lead' | 'job' | 'content' | string;
+  description: string;
+  timestamp: string;
+  meta: string;
 }
 
 export default function FeedPage() {
@@ -19,7 +18,7 @@ export default function FeedPage() {
       try {
         const res = await fetch('/api/activity');
         const data = await res.json();
-        setActivities(data);
+        setActivities(Array.isArray(data) ? data : []);
       } catch (e) {
         console.error('Failed to fetch activity:', e);
       } finally {
@@ -31,8 +30,8 @@ export default function FeedPage() {
     return () => clearInterval(interval);
   }, []);
 
-  const formatTime = (ts: number) => {
-    const diff = Date.now() - ts;
+  const formatRelativeTime = (timestamp: string) => {
+    const diff = Date.now() - new Date(timestamp).getTime();
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(diff / 3600000);
     const days = Math.floor(diff / 86400000);
@@ -45,19 +44,28 @@ export default function FeedPage() {
 
   const getIcon = (type: string) => {
     switch (type) {
-      case 'cron': return '⏰';
-      case 'session': return '💬';
-      case 'build': return '🔨';
-      case 'message': return '📬';
-      default: return '📌';
+      case 'lead':    return '📱';
+      case 'job':     return '💼';
+      case 'content': return '🎬';
+      default:        return '📡';
     }
   };
 
-  const getColor = (status: string) => {
-    switch (status) {
-      case 'success': return 'border-green-500/30';
-      case 'error': return 'border-red-500/30';
-      default: return 'border-gray-500/30';
+  const getColor = (type: string) => {
+    switch (type) {
+      case 'lead':    return 'border-cyan-500/40 text-cyan-300';
+      case 'job':     return 'border-blue-500/40 text-blue-300';
+      case 'content': return 'border-purple-500/40 text-purple-300';
+      default:        return 'border-gray-500/30 text-gray-400';
+    }
+  };
+
+  const getBorderColor = (type: string) => {
+    switch (type) {
+      case 'lead':    return 'border-l-cyan-500/60';
+      case 'job':     return 'border-l-blue-500/60';
+      case 'content': return 'border-l-purple-500/60';
+      default:        return 'border-l-gray-500/40';
     }
   };
 
@@ -76,24 +84,26 @@ export default function FeedPage() {
         <div className="text-center py-8 text-gray-500">No recent activity</div>
       ) : (
         <div className="space-y-2">
-          {activities.map((activity) => (
-            <div 
-              key={activity.id} 
-              className={`bg-[#1A1A2E] rounded-lg p-4 border-l-4 ${getColor(activity.status)}`}
+          {activities.map((activity, index) => (
+            <div
+              key={index}
+              className={`bg-[#1A1A2E] rounded-lg p-4 border-l-4 ${getBorderColor(activity.type)}`}
             >
               <div className="flex items-center gap-3">
                 <span className="text-xl">{getIcon(activity.type)}</span>
-                <div className="flex-1">
-                  <div className="text-sm">{activity.message}</div>
-                  <div className="text-xs text-gray-500">{formatTime(activity.timestamp)}</div>
+                <div className="flex-1 min-w-0">
+                  <div className={`text-sm font-medium truncate ${getColor(activity.type).split(' ')[1]}`}>
+                    {activity.description}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-0.5">
+                    {formatRelativeTime(activity.timestamp)}
+                  </div>
                 </div>
-                <span className={`text-xs px-2 py-0.5 rounded ${
-                  activity.status === 'success' ? 'bg-green-500/20 text-green-400' :
-                  activity.status === 'error' ? 'bg-red-500/20 text-red-400' :
-                  'bg-gray-500/20 text-gray-400'
-                }`}>
-                  {activity.status}
-                </span>
+                {activity.meta && (
+                  <span className="text-xs px-2 py-0.5 rounded bg-[#0A0A0F] text-gray-500 border border-[#2A2A3E] flex-shrink-0">
+                    {activity.meta}
+                  </span>
+                )}
               </div>
             </div>
           ))}

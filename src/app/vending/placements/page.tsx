@@ -26,6 +26,40 @@ export default function PlacementsPage() {
   const [activeTab, setActiveTab] = useState<'pipeline' | 'won' | 'lost'>('pipeline');
   const [placements, setPlacements] = useState<Placement[]>([]);
   const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState<string | null>(null);
+
+  const handleMarkWon = async (id: string) => {
+    setUpdating(id);
+    try {
+      const res = await fetch(`/api/vending/placements/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'closed_won', placement_date: new Date().toISOString() }),
+      });
+      if (res.ok) {
+        setPlacements(prev => prev.filter(p => p.id !== id));
+      }
+    } finally {
+      setUpdating(null);
+    }
+  };
+
+  const handleMarkLost = async (id: string) => {
+    const reason = prompt('Why was this lost? (optional)') ?? '';
+    setUpdating(id);
+    try {
+      const res = await fetch(`/api/vending/placements/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'closed_lost', lost_reason: reason }),
+      });
+      if (res.ok) {
+        setPlacements(prev => prev.filter(p => p.id !== id));
+      }
+    } finally {
+      setUpdating(null);
+    }
+  };
 
   useEffect(() => {
     async function fetchPlacements() {
@@ -108,11 +142,19 @@ export default function PlacementsPage() {
                   )}
                 </div>
                 <div className="flex gap-2">
-                  <button className="px-3 py-1.5 bg-green-600 text-white text-xs rounded-lg hover:bg-green-500">
-                    Mark Won
+                  <button
+                    onClick={() => handleMarkWon(placement.id)}
+                    disabled={updating === placement.id}
+                    className="px-3 py-1.5 bg-green-600 text-white text-xs rounded-lg hover:bg-green-500 disabled:opacity-50"
+                  >
+                    {updating === placement.id ? '...' : 'Mark Won'}
                   </button>
-                  <button className="px-3 py-1.5 border border-red-500 text-red-400 text-xs rounded-lg hover:bg-red-500/10">
-                    Mark Lost
+                  <button
+                    onClick={() => handleMarkLost(placement.id)}
+                    disabled={updating === placement.id}
+                    className="px-3 py-1.5 border border-red-500 text-red-400 text-xs rounded-lg hover:bg-red-500/10 disabled:opacity-50"
+                  >
+                    {updating === placement.id ? '...' : 'Mark Lost'}
                   </button>
                 </div>
               </div>

@@ -7,7 +7,8 @@ function safe(numerator: number, denominator: number): number {
   return numerator / denominator;
 }
 
-const REPLIED_STATUSES = `('replied','hot','warm','cold','opted_out')`;
+// Hardcoded known-safe status values — not user input, safe to inline in SQL
+const REPLIED_STATUSES = "('replied','hot','warm','cold','opted_out')";
 
 export async function GET() {
   try {

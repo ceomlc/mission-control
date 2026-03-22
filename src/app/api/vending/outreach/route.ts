@@ -14,13 +14,38 @@ export async function GET(request: Request) {
     `;
     const params: any[] = [];
     
-    if (status) {
-      params.push(status);
-      query += ` WHERE o.status = $${params.length}`;
+    const sent = searchParams.get('sent'); // ?sent=true → all emails with first_contact_sent_at set
+
+    if (sent === 'true') {
+      // Show anything actually sent regardless of status label Thoth used
+      query += ` WHERE o.first_contact_sent_at IS NOT NULL
+                   AND o.status::text NOT IN ('rejected', 'discarded', 'opted_out')`;
+      query += ' ORDER BY o.first_contact_sent_at DESC';
+    } else if (status) {
+      // Support comma-separated statuses: ?status=draft,pending_approval
+      const statuses = status.split(',').map(s => s.trim()).filter(Boolean);
+      if (statuses.length === 1) {
+        params.push(statuses[0]);
+        query += ` WHERE o.status::text = $${params.length}`;
+      } else {
+        const placeholders = statuses.map(s => {
+          params.push(s);
+          return `$${params.length}`;
+        }).join(', ');
+        query += ` WHERE o.status::text IN (${placeholders})`;
+      }
+
+      // Cap the approval queue at 40, oldest first
+      const isPendingQueue = status.includes('draft') || status.includes('pending_approval');
+      if (isPendingQueue) {
+        query += ' ORDER BY o.created_at ASC LIMIT 40';
+      } else {
+        query += ' ORDER BY o.created_at DESC';
+      }
+    } else {
+      query += ' ORDER BY o.created_at DESC';
     }
-    
-    query += ' ORDER BY o.created_at DESC';
-    
+
     const result = await pool.query(query, params);
     return NextResponse.json({ outreach: result.rows });
   } catch (error: any) {

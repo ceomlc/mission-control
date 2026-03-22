@@ -7,20 +7,27 @@ import { useState, useEffect } from 'react';
 const navItems = [
   { href: '/vending', label: 'Overview', icon: '📋' },
   { href: '/vending/leads', label: 'Leads', icon: '🎯' },
-  { href: '/vending/outreach', label: 'Outreach', icon: '📬', badge: true },
+  { href: '/vending/outreach', label: 'Outreach', icon: '📬', badge: 'email' },
+  { href: '/vending/phone', label: 'Phone', icon: '📞', badge: 'phone' },
   { href: '/vending/placements', label: 'Placements', icon: '🏆' },
 ];
 
 export default function VendingLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const [pendingCount, setPendingCount] = useState(0);
+  const [emailCount, setEmailCount] = useState(0);
+  const [phoneCount, setPhoneCount] = useState(0);
 
   useEffect(() => {
     async function fetchCounts() {
       try {
-        const res = await fetch('/api/vending/outreach?status=draft');
-        const data = await res.json();
-        setPendingCount(data.outreach?.length || 0);
+        const [emailRes, phoneRes] = await Promise.all([
+          fetch('/api/vending/outreach?status=draft'),
+          fetch('/api/vending/phone-leads'),
+        ]);
+        const emailData = await emailRes.json();
+        const phoneData = await phoneRes.json();
+        setEmailCount(emailData.outreach?.length || 0);
+        setPhoneCount(phoneData.leads?.length || 0);
       } catch (e) {
         console.error('Failed to fetch counts:', e);
       }
@@ -49,9 +56,14 @@ export default function VendingLayout({ children }: { children: React.ReactNode 
               >
                 <span>{item.icon}</span>
                 <span>{item.label}</span>
-                {item.badge && pendingCount > 0 && (
+                {item.badge === 'email' && emailCount > 0 && (
                   <span className="bg-orange-600 text-white text-xs px-1.5 py-0.5 rounded-full">
-                    {pendingCount}
+                    {emailCount}
+                  </span>
+                )}
+                {item.badge === 'phone' && phoneCount > 0 && (
+                  <span className="bg-blue-600 text-white text-xs px-1.5 py-0.5 rounded-full">
+                    {phoneCount}
                   </span>
                 )}
               </Link>

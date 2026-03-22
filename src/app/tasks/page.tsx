@@ -34,14 +34,14 @@ export default function TasksPage() {
     fetchTasks();
   }, []);
 
-  const filteredTasks = filter === 'all' 
-    ? tasks 
-    : tasks.filter((t) => t.status === filter);
+  const filteredTasks = filter === 'all'
+    ? tasks
+    : tasks.filter((t) => t.status.toLowerCase() === filter.toLowerCase());
 
-  const activeTasks = tasks.filter((t) => t.status === 'In progress' || t.status === 'In Progress');
-  const completedTasks = tasks.filter((t) => t.status === 'Done');
-  const blockedTasks = tasks.filter((t) => t.status === 'Blocked');
-  const criticalTasks = tasks.filter((t) => t.priority === 'High' && t.status !== 'Done');
+  const activeTasks = tasks.filter((t) => t.status.toLowerCase() === 'in progress');
+  const completedTasks = tasks.filter((t) => t.status.toLowerCase() === 'done');
+  const blockedTasks = tasks.filter((t) => t.status.toLowerCase() === 'blocked');
+  const criticalTasks = tasks.filter((t) => t.priority === 'High' && t.status.toLowerCase() !== 'done');
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -108,12 +108,12 @@ export default function TasksPage() {
             <div key={task.id} className="bg-[#1A1A2E] rounded-lg p-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className={`w-2 h-2 rounded-full ${
-                  task.status === 'Done' ? 'bg-green-500' :
-                  task.status === 'In progress' ? 'bg-[#22d3ee]' :
+                  task.status.toLowerCase() === 'done' ? 'bg-green-500' :
+                  task.status.toLowerCase() === 'in progress' ? 'bg-[#22d3ee]' :
                   'bg-gray-500'
                 }`} />
                 <div>
-                  <div className={task.status === 'Done' ? 'text-gray-500 line-through' : ''}>
+                  <div className={task.status.toLowerCase() === 'done' ? 'text-gray-500 line-through' : ''}>
                     {task.title}
                   </div>
                   <div className="text-xs text-gray-500">

@@ -14,27 +14,37 @@ const INTEREST_KEYWORDS = [
   'website', 'web design', 'design', 'marketing'
 ];
 
-// Keywords that indicate NOT interested (stop the workflow)
-const DISINTEREST_KEYWORDS = [
-  'no thanks', 'not interested', 'don\'t want', 'not looking',
-  'stop', 'remove', 'unsubscribe', 'leave me alone'
+// Legal opt-out keywords — must map to opted_out, not just cold
+const OPT_OUT_KEYWORDS = [
+  'stop', 'remove', 'unsubscribe', 'opt out', 'opt-out',
+  'leave me alone', 'do not contact', 'dont contact'
 ];
 
-function detectInterest(messageText: string): 'interested' | 'not_interested' | 'neutral' {
+// Keywords that indicate NOT interested (but not a legal opt-out)
+const DISINTEREST_KEYWORDS = [
+  'no thanks', 'not interested', 'don\'t want', 'not looking', 'no thank you'
+];
+
+function detectInterest(messageText: string): 'interested' | 'not_interested' | 'opted_out' | 'neutral' {
   if (!messageText) return 'neutral';
-  
+
   const lower = messageText.toLowerCase();
-  
-  // Check for disinterest first
+
+  // Check for legal opt-outs first — highest priority
+  for (const keyword of OPT_OUT_KEYWORDS) {
+    if (lower.includes(keyword)) return 'opted_out';
+  }
+
+  // Check for disinterest
   for (const keyword of DISINTEREST_KEYWORDS) {
     if (lower.includes(keyword)) return 'not_interested';
   }
-  
+
   // Check for interest
   for (const keyword of INTEREST_KEYWORDS) {
     if (lower.includes(keyword)) return 'interested';
   }
-  
+
   return 'neutral';
 }
 
@@ -43,9 +53,9 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { limit = 50, autoBuild = true } = body;
 
-    // Get drafted leads (the ones we're sending)
+    // Get sent leads (the ones we're waiting on replies for)
     const result = await pool.query(
-      "SELECT id, company_name, phone, website_url, google_rating FROM leads WHERE status = 'drafted' AND phone IS NOT NULL AND phone != '' LIMIT $1",
+      "SELECT id, company_name, phone, website_url, google_rating FROM leads WHERE status = 'sent' AND phone IS NOT NULL AND phone != '' LIMIT $1",
       [limit]
     );
 
@@ -92,12 +102,17 @@ export async function POST(request: Request) {
                 });
 
                 // Update status based on interest
-                if (interest === 'interested') {
+                if (interest === 'opted_out') {
                   await pool.query(
-                    "UPDATE leads SET status = 'interested', updated_at = NOW() WHERE id = $1",
-                    [lead.id]
+                    "UPDATE leads SET status = 'opted_out', response_text = $2, updated_at = NOW() WHERE id = $1",
+                    [lead.id, lastMsg.text]
                   );
-                  
+                } else if (interest === 'interested') {
+                  await pool.query(
+                    "UPDATE leads SET status = 'hot', response_text = $2, updated_at = NOW() WHERE id = $1",
+                    [lead.id, lastMsg.text]
+                  );
+
                   // AUTO-TRIGGER BUILD WORKFLOW
                   if (autoBuild && lead.website_url) {
                     try {
@@ -107,7 +122,7 @@ export async function POST(request: Request) {
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                           client: lead.company_name,
-                          url: lead.website,
+                          url: lead.website_url,
                           city: lead.city || '',
                           state: lead.state || 'MD'
                         })
@@ -149,14 +164,14 @@ export async function POST(request: Request) {
                   }
                 } else if (interest === 'not_interested') {
                   await pool.query(
-                    "UPDATE leads SET status = 'not_interested', updated_at = NOW() WHERE id = $1",
-                    [lead.id]
+                    "UPDATE leads SET status = 'cold', response_text = $2, updated_at = NOW() WHERE id = $1",
+                    [lead.id, lastMsg.text]
                   );
                 } else {
-                  // Just responded but neutral
+                  // Replied but neutral — log the text, keep in sequence
                   await pool.query(
-                    "UPDATE leads SET status = 'responded', updated_at = NOW() WHERE id = $1",
-                    [lead.id]
+                    "UPDATE leads SET status = 'replied', response_text = $2, updated_at = NOW() WHERE id = $1",
+                    [lead.id, lastMsg.text]
                   );
                 }
               }

@@ -59,8 +59,10 @@ export default function OutreachPage() {
       setLoading(true);
       try {
         const [pendingRes, activeRes] = await Promise.all([
-          fetch('/api/vending/outreach?status=draft'),
-          fetch('/api/vending/outreach?status=active'),
+          // Grab both 'draft' and 'pending_approval' — Thoth uses both
+          fetch('/api/vending/outreach?status=draft,pending_approval'),
+          // Show all actually-sent emails regardless of status label — keyed off first_contact_sent_at
+          fetch('/api/vending/outreach?sent=true'),
         ]);
         const pendingData = await pendingRes.json();
         const activeData = await activeRes.json();
@@ -75,14 +77,21 @@ export default function OutreachPage() {
     fetchData();
   }, []);
 
+  const [approveError, setApproveError] = useState<string | null>(null);
+
   const handleApprove = async (id: string) => {
     setApproving(id);
+    setApproveError(null);
     try {
       const res = await fetch(`/api/vending/outreach/${id}/approve`, { method: 'POST' });
       if (res.ok) {
         setPendingApproval(prev => prev.filter(item => item.id !== id));
+      } else {
+        const data = await res.json();
+        setApproveError(data.error || `Failed to send (${res.status})`);
       }
     } catch (error) {
+      setApproveError('Network error — check console');
       console.error('Failed to approve:', error);
     } finally {
       setApproving(null);
@@ -111,6 +120,14 @@ export default function OutreachPage() {
     <div className="space-y-8">
       <h1 className="text-2xl font-bold text-white">Outreach</h1>
       
+      {/* Approve error banner */}
+      {approveError && (
+        <div className="bg-red-900/40 border border-red-500 text-red-300 rounded-xl px-4 py-3 text-sm flex justify-between items-center">
+          <span>⚠️ {approveError}</span>
+          <button onClick={() => setApproveError(null)} className="text-red-400 hover:text-red-200 ml-4">✕</button>
+        </div>
+      )}
+
       {/* Approval Queue */}
       <section>
         <h2 className="text-lg font-semibold text-white mb-4">Approval Queue</h2>
