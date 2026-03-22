@@ -22,9 +22,10 @@ export default function ContentPage() {
       try {
         const res = await fetch('/api/content');
         const data = await res.json();
-        setIdeas(data);
+        setIdeas(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error('Failed to fetch:', error);
+        setIdeas([]);
       } finally {
         setLoading(false);
       }
