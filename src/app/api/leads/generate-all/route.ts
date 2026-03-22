@@ -49,35 +49,28 @@ function generatePersonalObservation(websiteStatus: string, googleRating: number
 }
 
 function generateMessage(lead: any): string {
-  const firstName = lead.company_name?.split(' ')[0] || 'there';
+  const firstName = lead.contact_name?.split(' ')[0] || lead.company_name?.split(' ')[0] || 'there';
   const city = lead.city || 'Baltimore';
   const industry = lead.industry || 'trade';
-  
-  // Use personal_observation from database if available
+  const companyName = lead.company_name || 'your business';
+
   const personalObservation = lead.personal_observation;
-  
-  if (personalObservation) {
-    return `Hey ${firstName} — I was looking into ${lead.company_name} online and noticed ${personalObservation}.\n\nI went ahead and put together a free website concept for you — already built it out. Want to see it?\n\nReply YES to check it out or NO and I'll leave you alone 🤝\n— Jaivien, More Life Consulting`;
-  }
-  
-  // Fallback to old logic if no personal_observation
   const hasWebsite = lead.has_website;
   const rating = lead.google_rating;
-  const reviewCount = lead.review_count || 0;
+
+  if (personalObservation) {
+    return `Hey ${firstName} — I was checking out ${companyName} online and noticed ${personalObservation}.\n\nI build websites for ${industry} businesses in ${city} — $97/month, includes free images, free edits anytime, no contracts.\n\nReply YES if interested or NO if not — no pressure.\n\n— Jaivien`;
+  }
 
   if (hasWebsite === false || hasWebsite === 'false' || hasWebsite === 0) {
-    return `Hey ${firstName} — searched for ${lead.company_name} on Google, your info comes up but there's nowhere to send people. Most ${industry.toLowerCase()} calls in ${city} go to whoever shows up first with a site. Happy to fix that fast if it's useful. — Jaivien`;
+    return `Hey ${firstName} — looked up ${companyName} and couldn't find a website. In ${city}, most ${industry} jobs go to whoever shows up first online.\n\nI do $97/month websites for ${industry} businesses — free images, free edits, no contracts. Quick to get live.\n\nReply YES if interested or NO if not — no pressure.\n\n— Jaivien`;
   }
-  
-  if (rating && rating < 4.0) {
-    return `Hey ${firstName} — ${lead.company_name} is sitting at ${rating} stars. Most customers filter below 4.0 without realizing it. We fix that for ${industry.toLowerCase()} businesses in ${city} pretty quickly — worth a 10 min call? — Jaivien`;
+
+  if (rating !== null && rating !== undefined && rating < 4.0) {
+    return `Hey ${firstName} — ${companyName} is sitting at ${rating} stars on Google. Most customers filter under 4.0 without thinking about it.\n\nI help ${industry} businesses in ${city} clean up their online presence — starting with a $97/month website built fast, free edits anytime.\n\nReply YES if interested or NO if not — no pressure.\n\n— Jaivien`;
   }
-  
-  if (rating && rating >= 4.0) {
-    return `Hey ${firstName} — looked at ${lead.company_name} online, you've got a ${rating} star rating. A few updates to your site could pull you ahead of the other ${industry.toLowerCase()} companies in ${city}. Happy to show you what's possible — no push. — Jaivien`;
-  }
-  
-  return `Hey ${firstName} — quick question about ${lead.company_name} in ${city}. What's the #1 thing keeping you from getting more calls? — Jaivien`;
+
+  return `Hey ${firstName} — quick one. I build websites for ${industry} businesses in ${city} — $97/month, free images, free edits, no contracts.\n\nWorth a look?\n\nReply YES if interested or NO if not — no pressure.\n\n— Jaivien`;
 }
 
 // Auto-research a single lead

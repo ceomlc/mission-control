@@ -101,9 +101,10 @@ export async function POST(request: Request) {
       const job = jobResult.rows[0];
 
       // Trigger automated deployment
+      const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://mission-control-app-theta.vercel.app';
       let deployResult = null;
       try {
-        const deployRes = await fetch('http://localhost:3000/api/deploy', {
+        const deployRes = await fetch(`${BASE_URL}/api/deploy`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ slug: job.client_slug })
