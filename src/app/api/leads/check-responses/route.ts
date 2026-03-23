@@ -2,29 +2,12 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
 
-function classifyResponse(text: string): 'opted_out' | 'hot' | 'cold' | 'replied' {
-  if (!text) return 'replied';
-  const lower = text.toLowerCase();
-
-  // Opt-out — highest priority
-  const optOutKeywords = ['stop', 'remove', 'unsubscribe', 'opt out', 'dont text', "don't text"];
-  for (const kw of optOutKeywords) {
-    if (lower.includes(kw)) return 'opted_out';
-  }
-
-  // Hot (YES / interested)
-  const hotKeywords = ['yes', 'yeah', 'yep', 'sure', 'interested', 'tell me more', 'sounds good', "let's do it", 'lets do it', 'go ahead'];
-  for (const kw of hotKeywords) {
-    if (lower.includes(kw)) return 'hot';
-  }
-
-  // Cold (NO / not interested)
-  const coldKeywords = ['no', 'not interested', 'no thanks', 'pass', 'nope'];
-  for (const kw of coldKeywords) {
-    if (lower.includes(kw)) return 'cold';
-  }
-
-  // Neutral — they replied but unclear
+function classifyResponse(text: string): 'hot' | 'cold' | 'replied' {
+  const t = text.toLowerCase().trim();
+  const yesSignals = ['yes','yeah','yep','sure','sounds good','interested',"let's do it",'go ahead','ok','okay','worth it','how','look','send it','show me','want in','sounds useful',"let's see",'go for it'];
+  const noSignals = ['no','nope','not interested','stop','remove me',"don't text me",'unsubscribe','leave me alone','out of my hair',"don't bother","please stop",'take me off'];
+  if (yesSignals.some(s => t.includes(s))) return 'hot';
+  if (noSignals.some(s => t.includes(s))) return 'cold';
   return 'replied';
 }
 
@@ -42,15 +25,15 @@ export async function POST() {
 
     // Fetch all leads with status 'sent'
     const result = await pool.query(
-      "SELECT id, company_name, phone FROM leads WHERE status = 'sent' AND phone IS NOT NULL AND phone != ''"
+      "SELECT * FROM leads WHERE status = 'sent' AND phone IS NOT NULL AND phone != ''"
     );
 
     if (result.rows.length === 0) {
-      return NextResponse.json({ checked: 0, updated: 0, breakdown: { hot: 0, cold: 0, opted_out: 0, replied: 0 } });
+      return NextResponse.json({ checked: 0, updated: 0, breakdown: { hot: 0, cold: 0, replied: 0 } });
     }
 
     let updated = 0;
-    const breakdown = { hot: 0, cold: 0, opted_out: 0, replied: 0 };
+    const breakdown = { hot: 0, cold: 0, replied: 0 };
 
     for (const lead of result.rows) {
       const phone = (lead.phone || '').replace(/\D/g, '');
@@ -69,21 +52,34 @@ export async function POST() {
 
         const lastMessage: string = data.lastMessage || '';
         const timestamp: string = data.timestamp || new Date().toISOString();
-        const status = classifyResponse(lastMessage);
+        const newStatus = classifyResponse(lastMessage);
 
-        breakdown[status]++;
+        breakdown[newStatus]++;
         updated++;
 
-        if (status === 'hot') {
+        if (newStatus === 'hot') {
           const note = `[YES — replied ${timestamp}. Build site next.]`;
           await pool.query(
             "UPDATE leads SET status = 'hot', response_text = $2, notes = $3, updated_at = NOW() WHERE id = $1",
             [lead.id, lastMessage, note]
           );
+
+          // Trigger Thoth build sequence for hot lead
+          try {
+            const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://mission-control-app-theta.vercel.app';
+            const thotMsg = `🔥 HOT LEAD — ${lead.company_name} in ${lead.city || 'Baltimore'} said YES.\n\nBusiness: ${lead.company_name}\nIndustry: ${lead.industry || 'trade'}\nCity: ${lead.city || 'Baltimore'}\nWebsite: ${lead.website_url || 'none'}\nGoogle Rating: ${lead.google_rating || 'not listed'}\nNotes: ${lead.personal_observation || 'none'}\n\nBUILD TASK: Create a website for this business. Use their industry, city, and any available info to build a relevant, professional site. When done, POST the preview URL to ${BASE_URL}/api/leads/${lead.id}/site-ready`;
+            await fetch(`${BASE_URL}/api/content/inbox`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ message: thotMsg, source: 'athena' })
+            });
+          } catch (e) {
+            console.error('Failed to notify Thoth inbox for hot lead', lead.id, e);
+          }
         } else {
           await pool.query(
             `UPDATE leads SET status = $2, response_text = $3, updated_at = NOW() WHERE id = $1`,
-            [lead.id, status, lastMessage]
+            [lead.id, newStatus, lastMessage]
           );
         }
       } catch (e) {

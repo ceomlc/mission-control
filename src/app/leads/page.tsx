@@ -2,12 +2,13 @@
 // Mission Control - Lead Generation Module
 // Updated: 2026-03-15 - Added retry functionality
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 interface Lead {
   id: number;
   company_name: string;
   first_name?: string;
+  contact_name?: string;
   phone: string;
   city: string;
   state: string;
@@ -22,6 +23,7 @@ interface Lead {
   source: string;
   notes: string;
   created_at: string;
+  loom_url?: string;
   // Research fields
   personal_observation?: string;
   website_status?: string;
@@ -294,6 +296,18 @@ export default function LeadsPage() {
       setCheckingResponses(false);
     }
   };
+
+  const handleSendLoom = useCallback(async (leadId: number) => {
+    try {
+      const res = await fetch(`/api/leads/${leadId}/send-loom`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to send loom');
+      alert('Loom follow-up sent!');
+      fetchLeads();
+    } catch (e: any) {
+      alert('Error: ' + e.message);
+    }
+  }, []);
 
   if (loading) return <div className="p-8 text-center text-gray-400">Loading leads...</div>;
 
@@ -662,6 +676,25 @@ export default function LeadsPage() {
               <div className="bg-[#0A0A0F] rounded-lg p-4 mb-4 border border-[#2A2A3E] space-y-3">
                 <p className="text-sm text-gray-500 font-medium">📋 Log Outreach Data</p>
 
+                {/* Site Ready for Review */}
+                {selectedLead.status === 'hot' && selectedLead.notes?.includes('[SITE READY:') && (() => {
+                  const siteUrl = selectedLead.notes.match(/\[SITE READY: ([^\]]+)\]/)?.[1];
+                  return (
+                    <div style={{ border: '1px solid #f59e0b', borderRadius: 8, padding: '12px 16px', marginBottom: 12, background: 'rgba(245,158,11,0.08)' }}>
+                      <div style={{ color: '#f59e0b', fontWeight: 700, marginBottom: 6 }}>🔥 Site Ready for Review</div>
+                      {siteUrl && (
+                        <a href={siteUrl} target="_blank" rel="noopener noreferrer"
+                           style={{ color: '#22d3ee', fontSize: 13, textDecoration: 'underline' }}>
+                          Preview Site →
+                        </a>
+                      )}
+                      <div style={{ marginTop: 8, color: '#aaa', fontSize: 12 }}>
+                        Add your Loom link below, then approve to send.
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {/* Loom URL */}
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">Loom URL</label>
@@ -681,6 +714,26 @@ export default function LeadsPage() {
                       Save
                     </button>
                   </div>
+                  {selectedLead.status === 'hot' && selectedLead.notes?.includes('[SITE READY:') && (
+                    <button
+                      onClick={() => handleSendLoom(selectedLead.id)}
+                      disabled={!selectedLead.loom_url && !loomInput}
+                      style={{
+                        marginTop: 8,
+                        padding: '8px 16px',
+                        background: (selectedLead.loom_url || loomInput) ? '#f59e0b' : '#3a3a4a',
+                        color: (selectedLead.loom_url || loomInput) ? '#000' : '#666',
+                        border: 'none',
+                        borderRadius: 6,
+                        fontWeight: 700,
+                        cursor: (selectedLead.loom_url || loomInput) ? 'pointer' : 'not-allowed',
+                        fontSize: 13,
+                        width: '100%'
+                      }}
+                    >
+                      {(selectedLead.loom_url || loomInput) ? 'Approve & Send Loom →' : 'Add Loom URL to enable'}
+                    </button>
+                  )}
                 </div>
 
                 {/* Call Outcome */}
