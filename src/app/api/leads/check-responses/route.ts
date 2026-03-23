@@ -58,24 +58,13 @@ export async function POST() {
         updated++;
 
         if (newStatus === 'hot') {
-          const note = `[YES — replied ${timestamp}. Build site next.]`;
+          // Mark hot + flag for INTAKE research — STEWARD polls /api/leads/hot-queue to pick this up
+          const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://mission-control-app-theta.vercel.app';
+          const note = `[YES — replied ${timestamp}. INTAKE_NEEDED] Build site: ${BASE_URL}/api/leads/${lead.id}/site-ready`;
           await pool.query(
             "UPDATE leads SET status = 'hot', response_text = $2, notes = $3, updated_at = NOW() WHERE id = $1",
             [lead.id, lastMessage, note]
           );
-
-          // Trigger Thoth build sequence for hot lead
-          try {
-            const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://mission-control-app-theta.vercel.app';
-            const thotMsg = `🔥 HOT LEAD — ${lead.company_name} in ${lead.city || 'Baltimore'} said YES.\n\nBusiness: ${lead.company_name}\nIndustry: ${lead.industry || 'trade'}\nCity: ${lead.city || 'Baltimore'}\nWebsite: ${lead.website_url || 'none'}\nGoogle Rating: ${lead.google_rating || 'not listed'}\nNotes: ${lead.personal_observation || 'none'}\n\nBUILD TASK: Create a website for this business. Use their industry, city, and any available info to build a relevant, professional site. When done, POST the preview URL to ${BASE_URL}/api/leads/${lead.id}/site-ready`;
-            await fetch(`${BASE_URL}/api/content/inbox`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ message: thotMsg, source: 'athena' })
-            });
-          } catch (e) {
-            console.error('Failed to notify Thoth inbox for hot lead', lead.id, e);
-          }
         } else {
           await pool.query(
             `UPDATE leads SET status = $2, response_text = $3, updated_at = NOW() WHERE id = $1`,

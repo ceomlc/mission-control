@@ -60,14 +60,24 @@ export async function POST(request: Request) {
     const leadsToMove = Math.min(draftedResult.rows.length, remainingSlots);
     const leadsToUpdate = draftedResult.rows.slice(0, leadsToMove);
 
-    // Update each lead to pending_approval
-    for (const lead of leadsToUpdate) {
+    // Determine active test pair for this week
+    const weekParity = Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000)) % 2;
+    const activePair = weekParity === 0
+      ? ['a1', 'b1', 'a2', 'b2']
+      : ['a3', 'b3', 'a4', 'b4'];
+
+    // Pre-assigned rotation: A1, B1, A2, B2, A1, B1, A2, B2...
+    // Guarantees even distribution regardless of batch size
+    for (let i = 0; i < leadsToUpdate.length; i++) {
+      const lead = leadsToUpdate[i];
+      const variant = activePair[i % activePair.length];
       await pool.query(
-        `UPDATE leads SET 
-          status = 'pending_approval', 
+        `UPDATE leads SET
+          status = 'pending_approval',
+          variant = COALESCE(variant, $2),
           updated_at = CURRENT_TIMESTAMP
         WHERE id = $1`,
-        [lead.id]
+        [lead.id, variant]
       );
     }
 
