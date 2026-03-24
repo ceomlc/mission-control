@@ -1,65 +1,51 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface CronJob {
   id: string;
   name: string;
-  time: string; // "09:00", "14:00", "23:00"
-  days: string[]; // ["Mon", "Tue", etc]
-  nextRun: Date;
-  lastStatus: string;
+  time: string;
+  days: string[];
+  status: string;
   color: string;
 }
 
-const cronJobs: CronJob[] = [
-  {
-    id: '1',
-    name: 'Morning Brief',
-    time: '09:00',
-    days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
-    nextRun: new Date(new Date().setHours(9, 0, 0, 0)),
-    lastStatus: 'ok',
-    color: '#22d3ee'
-  },
-  {
-    id: '2',
-    name: 'Daily Research',
-    time: '14:00',
-    days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
-    nextRun: new Date(new Date().setHours(14, 0, 0, 0)),
-    lastStatus: 'ok',
-    color: '#a855f7'
-  },
-  {
-    id: '3',
-    name: 'Nightly Build',
-    time: '23:00',
-    days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-    nextRun: new Date(new Date().setHours(23, 0, 0, 0)),
-    lastStatus: 'ok',
-    color: '#f97316'
-  },
-  {
-    id: '4',
-    name: '2nd Brain Upload',
-    time: '23:00',
-    days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-    nextRun: new Date(new Date().setHours(23, 0, 0, 0)),
-    lastStatus: 'ok',
-    color: '#10b981'
-  }
-];
-
-const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const hours = Array.from({ length: 24 }, (_, i) => i);
+const JOB_COLORS: Record<string, string> = {
+  'Scout': '#22d3ee',
+  'Enrich': '#a855f7', 
+  'Qualifier': '#f97316',
+  'Hermes': '#10b981',
+  'Check': '#eab308',
+  'Content': '#8b5cf6',
+};
 
 export default function CalendarPage() {
+  const [jobs, setJobs] = useState<CronJob[]>([]);
+  const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
   
   const today = new Date();
-  const currentDay = today.getDay();
   const currentHour = today.getHours();
+  const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  useEffect(() => {
+    fetch('/api/calendar')
+      .then(res => res.json())
+      .then(data => {
+        const mapped = (data.jobs || []).map((j: any) => ({
+          id: j.id,
+          name: j.name,
+          time: j.time || 'N/A',
+          days: j.days || [],
+          status: j.status || 'scheduled',
+          color: JOB_COLORS[j.name?.split(' ')[0]] || '#6b7280',
+        }));
+        setJobs(mapped);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
 
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear();
@@ -82,8 +68,7 @@ export default function CalendarPage() {
     if (day === null) return [];
     const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
     const dayName = daysOfWeek[date.getDay()];
-    
-    return cronJobs.filter(job => job.days.includes(dayName));
+    return jobs.filter(job => job.days.includes(dayName));
   };
 
   const isToday = (day: number | null) => {
@@ -175,7 +160,7 @@ export default function CalendarPage() {
           <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-[#2A2A3E]" />
           
           <div className="space-y-4">
-            {cronJobs.map(job => {
+            {jobs.map(job => {
               const [hour, minute] = job.time.split(':').map(Number);
               const isPast = hour < currentHour;
               const isCurrent = hour === currentHour;
@@ -206,7 +191,7 @@ export default function CalendarPage() {
       <div className="bg-[#1A1A2E] rounded-xl p-6">
         <h2 className="text-lg font-medium mb-4">All Scheduled Jobs</h2>
         <div className="space-y-2">
-          {cronJobs.map(job => (
+          {jobs.map(job => (
             <div key={job.id} className="flex items-center justify-between p-3 bg-[#0A0A0F] rounded-lg">
               <div className="flex items-center gap-3">
                 <div className="w-3 h-3 rounded-full" style={{ backgroundColor: job.color }} />
