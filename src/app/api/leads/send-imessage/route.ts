@@ -25,7 +25,15 @@ export async function POST(request: Request) {
 
     const lead = leadResult.rows[0];
 
-    // Validate lead is in pending_approval status
+    // Validate lead is in pending_approval status.
+    // Reject if already sent/approved to prevent double-sends.
+    if (lead.status === 'sent' || lead.status === 'approved') {
+      return NextResponse.json(
+        { error: `Lead already sent — status is '${lead.status}'. Refusing to send again.` },
+        { status: 409 }
+      );
+    }
+
     if (lead.status !== 'pending_approval') {
       return NextResponse.json(
         { error: `Lead must be in 'pending_approval' status to send. Current status: ${lead.status}` },
@@ -85,11 +93,11 @@ export async function POST(request: Request) {
 
     // Update lead based on result
     if (relayResult.success) {
-      // Mark as 'approved' = relay accepted, pending iMessage delivery confirmation.
-      // Athena's relay will call /api/leads/delivery-receipt to confirm actual delivery,
-      // at which point status moves to 'sent' and counts in KPI.
+      // Mark directly as 'sent' — Mission Control is the sender here.
+      // We skip the 'approved' intermediate state intentionally so HERALD
+      // does NOT pick this lead up and send it a second time.
       await pool.query(
-        `UPDATE leads SET status = 'approved', updated_at = NOW() WHERE id = $1`,
+        `UPDATE leads SET status = 'sent', message_sent_date = NOW(), updated_at = NOW() WHERE id = $1`,
         [lead_id]
       );
 
@@ -98,14 +106,14 @@ export async function POST(request: Request) {
         lead_id,
         recipient: lead.phone,
         timestamp: relayResult.timestamp,
-        message: 'iMessage handed to relay — awaiting delivery confirmation'
+        message: 'iMessage sent and marked as sent'
       });
     } else {
       // Relay rejected — leave as pending_approval so it stays in queue
       const errorMsg = relayResult.error || 'Unknown error';
       const note = `[Relay error: ${errorMsg}]`;
       await pool.query(
-        `UPDATE leads SET notes = COALESCE(notes || ' ', '') || $2, updated_at = NOW() WHERE id = $1`,
+        `UPDATE leads SET research_notes = COALESCE(research_notes || ' ', '') || $2, updated_at = NOW() WHERE id = $1`,
         [lead_id, note]
       );
 

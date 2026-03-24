@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface OutreachItem {
   id: string;
@@ -12,6 +12,10 @@ interface OutreachItem {
   f1_sent_at?: string;
   f2_sent_at?: string;
   f3_sent_at?: string;
+  f1_subject?: string;
+  f1_body?: string;
+  f2_subject?: string;
+  f2_body?: string;
   business_name: string;
   city: string;
   state: string;
@@ -49,25 +53,31 @@ function getDaysInSequence(outreach: OutreachItem): number {
 
 export default function OutreachPage() {
   const [pendingApproval, setPendingApproval] = useState<OutreachItem[]>([]);
+  const [noEmailLeads, setNoEmailLeads] = useState<OutreachItem[]>([]);
   const [activeSequences, setActiveSequences] = useState<OutreachItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [approving, setApproving] = useState<string | null>(null);
   const [rejecting, setRejecting] = useState<string | null>(null);
+  const [showNoEmail, setShowNoEmail] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
       try {
-        const [pendingRes, activeRes] = await Promise.all([
-          // Grab both 'draft' and 'pending_approval' — Thoth uses both
+        const [pendingRes, activeRes, noEmailRes] = await Promise.all([
+          // Only leads WITH an email — backend now filters these
           fetch('/api/vending/outreach?status=draft,pending_approval'),
-          // Show all actually-sent emails regardless of status label — keyed off first_contact_sent_at
+          // All actually-sent emails regardless of status label
           fetch('/api/vending/outreach?sent=true'),
+          // Leads with no email on file — shown separately, not in main queue
+          fetch('/api/vending/outreach?no_email=true'),
         ]);
         const pendingData = await pendingRes.json();
         const activeData = await activeRes.json();
+        const noEmailData = await noEmailRes.json();
         setPendingApproval(pendingData.outreach || []);
         setActiveSequences(activeData.outreach || []);
+        setNoEmailLeads(noEmailData.outreach || []);
       } catch (error) {
         console.error('Failed to fetch outreach:', error);
       } finally {
@@ -77,6 +87,7 @@ export default function OutreachPage() {
     fetchData();
   }, []);
 
+  const [expandedSequence, setExpandedSequence] = useState<string | null>(null);
   const [approveError, setApproveError] = useState<string | null>(null);
 
   const handleApprove = async (id: string) => {
@@ -119,7 +130,45 @@ export default function OutreachPage() {
   return (
     <div className="space-y-8">
       <h1 className="text-2xl font-bold text-white">Outreach</h1>
-      
+
+      {/* No Email Warning */}
+      {noEmailLeads.length > 0 && (
+        <div className="bg-red-950/40 border border-red-500/40 rounded-xl px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-red-400 font-semibold text-sm">
+                ⚠️ {noEmailLeads.length} draft{noEmailLeads.length !== 1 ? 's' : ''} have no email on file — removed from approval queue
+              </span>
+            </div>
+            <button
+              onClick={() => setShowNoEmail(v => !v)}
+              className="text-xs text-red-400 hover:text-red-200 underline"
+            >
+              {showNoEmail ? 'Hide' : 'Show'} →
+            </button>
+          </div>
+          {showNoEmail && (
+            <div className="mt-3 space-y-2">
+              {noEmailLeads.map(item => (
+                <div key={item.id} className="flex items-center justify-between bg-[#1A1A2E] rounded-lg px-3 py-2 text-sm">
+                  <div>
+                    <span className="text-white font-medium">{item.business_name}</span>
+                    <span className="text-gray-500 ml-2 text-xs">{item.city}, {item.state} • {item.vertical}</span>
+                  </div>
+                  <button
+                    onClick={() => handleReject(item.id)}
+                    disabled={rejecting === item.id}
+                    className="text-xs text-red-400 hover:text-red-200 border border-red-500/30 rounded px-2 py-1 disabled:opacity-50"
+                  >
+                    {rejecting === item.id ? '...' : 'Discard'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Approve error banner */}
       {approveError && (
         <div className="bg-red-900/40 border border-red-500 text-red-300 rounded-xl px-4 py-3 text-sm flex justify-between items-center">
@@ -203,27 +252,63 @@ export default function OutreachPage() {
                   <th className="px-4 py-3">Stage</th>
                   <th className="px-4 py-3">Days</th>
                   <th className="px-4 py-3">Last Sent</th>
+                  <th className="px-4 py-3"></th>
                 </tr>
               </thead>
               <tbody className="text-gray-300 text-sm">
                 {activeSequences.map((item) => (
-                  <tr key={item.id} className="border-b border-[#2A2A3E]">
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-white">{item.business_name}</div>
-                      <div className="text-gray-500 text-xs">{item.city}, {item.state}</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="px-2 py-1 bg-cyan-900 text-cyan-300 rounded text-xs">
-                        {getSequenceStage(item)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">{getDaysInSequence(item)} days</td>
-                    <td className="px-4 py-3 text-gray-500">
-                      {item.first_contact_sent_at 
-                        ? new Date(item.first_contact_sent_at).toLocaleDateString()
-                        : '-'}
-                    </td>
-                  </tr>
+                  <React.Fragment key={item.id}>
+                    <tr
+                      className="border-b border-[#2A2A3E] hover:bg-[#2A2A3E]/30 cursor-pointer"
+                      onClick={() => setExpandedSequence(expandedSequence === item.id ? null : item.id)}
+                    >
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-white">{item.business_name}</div>
+                        <div className="text-gray-500 text-xs">{item.city}, {item.state}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="px-2 py-1 bg-cyan-900 text-cyan-300 rounded text-xs">
+                          {getSequenceStage(item)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">{getDaysInSequence(item)} days</td>
+                      <td className="px-4 py-3 text-gray-500">
+                        {item.first_contact_sent_at
+                          ? new Date(item.first_contact_sent_at).toLocaleDateString()
+                          : '-'}
+                      </td>
+                      <td className="px-4 py-3 text-gray-500 text-xs">{expandedSequence === item.id ? '▲' : '▼'}</td>
+                    </tr>
+                    {expandedSequence === item.id && (
+                      <tr className="border-b border-[#2A2A3E]">
+                        <td colSpan={5} className="px-4 py-3 bg-[#0A0A0F]">
+                          <div className="space-y-3">
+                            {item.first_contact_body && (
+                              <div>
+                                <p className="text-xs text-cyan-400 font-semibold mb-1">Touch 1 — First Contact</p>
+                                <p className="text-xs text-gray-400 mb-1">Subject: {item.first_contact_subject}</p>
+                                <pre className="text-xs text-gray-300 whitespace-pre-wrap font-mono">{item.first_contact_body}</pre>
+                              </div>
+                            )}
+                            {item.f1_body && (
+                              <div className="border-t border-[#2A2A3E] pt-3">
+                                <p className="text-xs text-yellow-400 font-semibold mb-1">Touch 2 — Follow-Up (Day 3-4)</p>
+                                <p className="text-xs text-gray-400 mb-1">Subject: {item.f1_subject}</p>
+                                <pre className="text-xs text-gray-300 whitespace-pre-wrap font-mono">{item.f1_body}</pre>
+                              </div>
+                            )}
+                            {item.f2_body && (
+                              <div className="border-t border-[#2A2A3E] pt-3">
+                                <p className="text-xs text-orange-400 font-semibold mb-1">Touch 3 — Final (Day 7)</p>
+                                <p className="text-xs text-gray-400 mb-1">Subject: {item.f2_subject}</p>
+                                <pre className="text-xs text-gray-300 whitespace-pre-wrap font-mono">{item.f2_body}</pre>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>

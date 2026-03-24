@@ -6,14 +6,28 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
-    
+    const noEmail = searchParams.get('no_email'); // ?no_email=true → leads with no email address
+
+    // ── ?no_email=true — return draft leads that have no email ──────────────
+    if (noEmail === 'true') {
+      const { rows } = await pool.query(`
+        SELECT o.*, l.business_name, l.city, l.state, l.tier, l.vertical, l.email
+        FROM vending_outreach o
+        JOIN vending_leads l ON o.lead_id = l.id
+        WHERE o.status::text IN ('draft', 'pending_approval')
+          AND (l.email IS NULL OR l.email = '')
+        ORDER BY o.created_at ASC
+      `);
+      return NextResponse.json({ outreach: rows });
+    }
+
     let query = `
-      SELECT o.*, l.business_name, l.city, l.state, l.tier, l.vertical
+      SELECT o.*, l.business_name, l.city, l.state, l.tier, l.vertical, l.email
       FROM vending_outreach o
       JOIN vending_leads l ON o.lead_id = l.id
     `;
     const params: any[] = [];
-    
+
     const sent = searchParams.get('sent'); // ?sent=true → all emails with first_contact_sent_at set
 
     if (sent === 'true') {
@@ -23,7 +37,10 @@ export async function GET(request: Request) {
       query += ' ORDER BY o.first_contact_sent_at DESC';
     } else if (status) {
       // Support comma-separated statuses: ?status=draft,pending_approval
+      // Always exclude leads with no email from the approval queue — they can't be sent
       const statuses = status.split(',').map(s => s.trim()).filter(Boolean);
+      const isPendingQueue = status.includes('draft') || status.includes('pending_approval');
+
       if (statuses.length === 1) {
         params.push(statuses[0]);
         query += ` WHERE o.status::text = $${params.length}`;
@@ -35,9 +52,9 @@ export async function GET(request: Request) {
         query += ` WHERE o.status::text IN (${placeholders})`;
       }
 
-      // Cap the approval queue at 40, oldest first
-      const isPendingQueue = status.includes('draft') || status.includes('pending_approval');
+      // For the approval queue: only show leads that actually have an email
       if (isPendingQueue) {
+        query += ` AND l.email IS NOT NULL AND l.email != ''`;
         query += ' ORDER BY o.created_at ASC LIMIT 40';
       } else {
         query += ' ORDER BY o.created_at DESC';

@@ -2,97 +2,87 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import pool from '@/lib/vending-db';
 
-function safe(numerator: number, denominator: number): number {
-  if (denominator === 0) return 0;
-  return numerator / denominator;
+function safe(num: number, den: number) {
+  return den === 0 ? 0 : num / den;
 }
 
 export async function GET() {
   try {
     const client = await pool.connect();
-
     try {
-      // Fetch all relevant lead data joined with outreach
-      const { rows } = await client.query(`
+      // ── Summary funnel metrics ────────────────────────────────────────────
+      const { rows: [s] } = await client.query(`
         SELECT
-          vl.id,
-          vl.sequence_day,
-          vl.loom_url,
-          vl.call_outcome::TEXT AS call_outcome,
-          vl.variant::TEXT AS variant,
-          vl.trade,
-          vo.status::TEXT AS status,
-          vo.reply_summary
-        FROM vending_leads vl
-        LEFT JOIN vending_outreach vo ON vo.lead_id = vl.id
+          COUNT(*) FILTER (WHERE first_contact_sent_at IS NOT NULL)::int                        AS total_sent,
+          COUNT(*) FILTER (WHERE status::text = 'bounced')::int                                  AS total_bounced,
+          COUNT(*) FILTER (WHERE reply_received_at IS NOT NULL
+                             AND status::text != 'bounced')::int                                 AS total_replied,
+          COUNT(*) FILTER (WHERE status::text = 'interested')::int                              AS total_interested,
+          COUNT(*) FILTER (WHERE status::text IN ('opted_out', 'not_interested'))::int           AS opted_out,
+          COUNT(*) FILTER (WHERE f1_sent_at IS NOT NULL)::int                                   AS touch2_sent,
+          COUNT(*) FILTER (WHERE f2_sent_at IS NOT NULL)::int                                   AS touch3_sent
+        FROM vending_outreach
       `);
 
-      // --- summary metrics ---
-
-      // touch1_reply_rate: sequence_day=1 AND status='replied' / sequence_day >= 1
-      const touch1_total = rows.filter(r => (r.sequence_day ?? 0) >= 1).length;
-      const touch1_replied = rows.filter(r => (r.sequence_day ?? 0) === 1 && r.status === 'replied').length;
-
-      // yes_rate: reply_summary ILIKE '%yes%' / status='replied'
-      const total_replied = rows.filter(r => r.status === 'replied').length;
-      const yes_count = rows.filter(r => r.reply_summary && r.reply_summary.toLowerCase().includes('yes')).length;
-
-      // loom_reply_rate: sequence_day=3 AND status='replied' / loom_url IS NOT NULL
-      const loom_sent = rows.filter(r => r.loom_url != null).length;
-      const loom_replied = rows.filter(r => (r.sequence_day ?? 0) === 3 && r.status === 'replied').length;
-
-      // call_booking_rate: call_outcome='booked' / call_outcome IS NOT NULL
-      const call_total = rows.filter(r => r.call_outcome != null).length;
-      const call_booked = rows.filter(r => r.call_outcome === 'booked').length;
-
-      // breakup_reply_rate: sequence_day=5 AND status='replied' / sequence_day=5
-      const touch5_total = rows.filter(r => (r.sequence_day ?? 0) === 5).length;
-      const touch5_replied = rows.filter(r => (r.sequence_day ?? 0) === 5 && r.status === 'replied').length;
-
-      // end_to_end_conversion: call_outcome='booked' / status != 'pending_approval'
-      const total_contacted = rows.filter(r => r.status !== 'pending_approval').length;
-
-      // opt_out_rate: status='opted_out' / status != 'pending_approval'
-      const opted_out = rows.filter(r => r.status === 'opted_out').length;
+      // Deliverable sends = total sent minus bounces (denominator for reply rate)
+      const deliverable = s.total_sent - s.total_bounced;
 
       const summary = {
-        touch1_reply_rate: safe(touch1_replied, touch1_total),
-        yes_rate: safe(yes_count, total_replied),
-        loom_reply_rate: safe(loom_replied, loom_sent),
-        call_booking_rate: safe(call_booked, call_total),
-        breakup_reply_rate: safe(touch5_replied, touch5_total),
-        end_to_end_conversion: safe(call_booked, total_contacted),
-        opt_out_rate: safe(opted_out, total_contacted),
+        total_sent:         s.total_sent,
+        total_bounced:      s.total_bounced,
+        deliverable:        deliverable,
+        total_replied:      s.total_replied,
+        total_interested:   s.total_interested,
+        opted_out:          s.opted_out,
+        touch2_sent:        s.touch2_sent,
+        touch3_sent:        s.touch3_sent,
+        reply_rate:         safe(s.total_replied, deliverable),
+        interest_rate:      safe(s.total_interested, s.total_replied),
+        end_to_end:         safe(s.total_interested, deliverable),
+        opt_out_rate:       safe(s.opted_out, deliverable),
+        bounce_rate:        safe(s.total_bounced, s.total_sent),
       };
 
-      // --- A/B splits ---
-      // Group by (variant, trade)
-      const splitMap: Record<string, { sends: number; replies: number; yes_count: number }> = {};
+      // ── A/B split by variant ──────────────────────────────────────────────
+      const { rows: splitRows } = await client.query(`
+        SELECT
+          COALESCE(variant, 'a')                                             AS variant,
+          COUNT(*)::int                                                       AS sends,
+          COUNT(*) FILTER (WHERE reply_received_at IS NOT NULL)::int         AS replies,
+          COUNT(*) FILTER (WHERE status = 'interested')::int                 AS interested
+        FROM vending_outreach
+        WHERE first_contact_sent_at IS NOT NULL
+        GROUP BY variant
+        ORDER BY variant
+      `);
 
-      for (const row of rows) {
-        if (row.variant == null || row.trade == null) continue;
-        const key = `${row.variant}|||${row.trade}`;
-        if (!splitMap[key]) {
-          splitMap[key] = { sends: 0, replies: 0, yes_count: 0 };
-        }
-        splitMap[key].sends += 1;
-        if (row.status === 'replied') {
-          splitMap[key].replies += 1;
-          if (row.reply_summary && row.reply_summary.toLowerCase().includes('yes')) {
-            splitMap[key].yes_count += 1;
-          }
-        }
-      }
+      const splits = splitRows.map(r => ({
+        variant:       r.variant,
+        label:         r.variant === 'a' ? 'Benefit frame' : 'Question frame',
+        sends:         r.sends,
+        replies:       r.replies,
+        interested:    r.interested,
+        reply_rate:    safe(r.replies, r.sends),
+        interest_rate: safe(r.interested, r.replies),
+        sample_status: r.sends >= 30 ? 'sufficient' : r.sends >= 10 ? 'building' : 'too_early',
+      }));
 
-      const splits = Object.entries(splitMap).map(([key, data]) => {
-        const [variant, trade] = key.split('|||');
-        const reply_rate = safe(data.replies, data.sends);
-        const yes_rate = safe(data.yes_count, data.replies);
-        const sample_status = data.sends >= 50 ? 'sufficient' : 'insufficient_data';
-        return { variant, trade, sends: data.sends, reply_rate, yes_rate, sample_status };
-      });
+      // ── Touch performance ─────────────────────────────────────────────────
+      const { rows: touchRows } = await client.query(`
+        SELECT
+          CASE
+            WHEN f2_sent_at IS NOT NULL AND reply_received_at >= f2_sent_at THEN 'Touch 3'
+            WHEN f1_sent_at IS NOT NULL AND reply_received_at >= f1_sent_at THEN 'Touch 2'
+            ELSE 'Touch 1'
+          END AS touch,
+          COUNT(*)::int AS replies
+        FROM vending_outreach
+        WHERE reply_received_at IS NOT NULL
+        GROUP BY touch
+        ORDER BY touch
+      `);
 
-      return NextResponse.json({ summary, splits });
+      return NextResponse.json({ summary, splits, touch_performance: touchRows });
     } finally {
       client.release();
     }
