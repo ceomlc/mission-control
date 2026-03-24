@@ -1,4 +1,5 @@
 export const dynamic = 'force-dynamic';
+export const maxDuration = 300; // Vercel Pro allows up to 300s for long-running cron routes
 import { NextResponse } from 'next/server';
 import vendingPool from '@/lib/vending-db';
 import leadsPool from '@/lib/db';
@@ -106,8 +107,11 @@ export async function GET() {
           for (const place of places) {
             const name: string = place.name || '';
             const address: string = place.formatted_address || '';
-            const cityPart = city.split(' ')[0]; // "Arlington", "Bethesda", etc.
-            const statePart = city.split(' ')[1] || '';
+            // State code is always the last word; city is everything before it
+            // e.g. "Silver Spring MD" → city="Silver Spring", state="MD"
+            const cityTokens = city.split(' ');
+            const statePart = cityTokens[cityTokens.length - 1];
+            const cityPart = cityTokens.slice(0, -1).join(' ');
             const phone: string = place.formatted_phone_number || '';
             const website: string = place.website || '';
             const { score, tier } = scoreLead(place);
