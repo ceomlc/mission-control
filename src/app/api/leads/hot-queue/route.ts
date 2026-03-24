@@ -21,10 +21,10 @@ export async function GET() {
   try {
     const result = await pool.query(
       `SELECT id, company_name, industry, city, phone, website_url,
-              google_rating, personal_observation, notes, updated_at
+              google_rating, personal_observation, research_notes, updated_at
        FROM leads
        WHERE status = 'hot'
-         AND notes LIKE '%INTAKE_NEEDED%'
+         AND research_notes LIKE '%INTAKE_NEEDED%'
        ORDER BY updated_at DESC`
     );
 
@@ -39,7 +39,7 @@ export async function GET() {
       website_url:         lead.website_url || null,
       google_rating:       lead.google_rating || null,
       personal_observation: lead.personal_observation || null,
-      notes:               lead.notes,
+      notes:               lead.research_notes,
       // Convenience: the URL Forge/INTAKE should POST the finished site URL to
       site_ready_url:      `${BASE_URL}/api/leads/${lead.id}/site-ready`,
       replied_at:          lead.updated_at
@@ -71,7 +71,7 @@ export async function PATCH(request: Request) {
 
     await pool.query(
       `UPDATE leads
-       SET notes = REPLACE(notes, 'INTAKE_NEEDED', $2),
+       SET research_notes = REPLACE(research_notes, 'INTAKE_NEEDED', $2),
            updated_at = NOW()
        WHERE id = $1`,
       [id, flag]

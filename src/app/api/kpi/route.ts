@@ -8,7 +8,8 @@ function safe(numerator: number, denominator: number): number {
 }
 
 // Hardcoded known-safe status values — not user input, safe to inline in SQL
-const REPLIED_STATUSES = "('replied','hot','warm','cold','opted_out')";
+// 'warm' excluded: it's now the initial status for new uncontacted leads (not a reply signal)
+const REPLIED_STATUSES = "('replied','hot','cold','opted_out')";
 
 export async function GET() {
   try {
@@ -30,8 +31,8 @@ export async function GET() {
             AND status NOT IN ('pending_approval','bad_data'))::int                                                AS in_sequence,
           COUNT(*) FILTER (WHERE status IN ${REPLIED_STATUSES})::int                                               AS total_replied,
 
-          -- leads_contacted: all leads that have left pending_approval
-          COUNT(*) FILTER (WHERE status != 'pending_approval')::int                                                AS leads_contacted,
+          -- leads_contacted: leads that have had a message actually sent or delivered
+          COUNT(*) FILTER (WHERE status IN ('sent','approved','replied','hot','cold','opted_out','waiting_on_loom'))::int AS leads_contacted,
 
           -- Touch 1 reply rate: replied at touch 1 / all contacted at touch 1+
           COUNT(*) FILTER (WHERE sequence_day >= 1)::int                                                           AS touch1_total,

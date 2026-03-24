@@ -23,9 +23,15 @@ export async function POST() {
     const relayBase = process.env.IMESSAGE_RELAY_BASE
       || relayUrl.replace(/\/send$/, '');
 
-    // Fetch all leads with status 'sent'
+    // Only check leads sent within the last 14 days — avoids Vercel 30s timeout on large datasets.
+    // Older leads have had enough time to reply; STEWARD can handle deeper checks from Mac Mini.
     const result = await pool.query(
-      "SELECT * FROM leads WHERE status = 'sent' AND phone IS NOT NULL AND phone != ''"
+      `SELECT * FROM leads
+       WHERE status = 'sent'
+         AND phone IS NOT NULL AND phone != ''
+         AND updated_at >= NOW() - INTERVAL '14 days'
+       ORDER BY updated_at DESC
+       LIMIT 100`
     );
 
     if (result.rows.length === 0) {
@@ -62,7 +68,7 @@ export async function POST() {
           const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://mission-control-app-theta.vercel.app';
           const note = `[YES — replied ${timestamp}. INTAKE_NEEDED] Build site: ${BASE_URL}/api/leads/${lead.id}/site-ready`;
           await pool.query(
-            "UPDATE leads SET status = 'hot', response_text = $2, notes = $3, updated_at = NOW() WHERE id = $1",
+            "UPDATE leads SET status = 'hot', response_text = $2, research_notes = $3, updated_at = NOW() WHERE id = $1",
             [lead.id, lastMessage, note]
           );
         } else {

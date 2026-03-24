@@ -38,26 +38,39 @@ type CallState = 'idle' | 'connecting' | 'ringing' | 'in-progress' | 'ended';
 type DeviceState = 'offline' | 'initializing' | 'ready' | 'error';
 
 function getDefaultScript(lead: PhoneLead): string {
-  const name = lead.contact_name?.split(' ').length! <= 3 && lead.contact_name
-    ? lead.contact_name.split(' ')[0]
-    : 'there';
+  const vertical = lead.vertical?.toLowerCase() || '';
+  const biz = lead.business_name || 'your business';
+  const city = lead.city || 'your area';
 
-  const map: Record<string, string> = {
-    gym: `Hey ${name}, my name's Jaivien with More Life Vending. We work with independent gyms to place a free vending machine — we stock it, maintain it, you earn a commission on every sale with no cost to you. Is that worth a quick 2-minute conversation?`,
-    fitness: `Hey ${name}, Jaivien from More Life Vending. We help fitness studios offer snacks and drinks to members at zero cost — we handle everything and you earn a percentage. Worth a quick chat?`,
-    'auto': `Hey ${name}, Jaivien here from More Life Vending. We set up free vending machines in auto shops for customers while they wait. No cost to you, we handle restocking, and you earn a cut of every sale. Got 2 minutes?`,
-    hotel: `Hey ${name}, Jaivien with More Life Vending. We place free vending machines in hotels — snacks and drinks for guests around the clock. Zero upfront cost, you earn a percentage of sales, we handle everything. Quick question — is the GM available?`,
-    apartment: `Hey ${name}, Jaivien from More Life Vending. We install free vending machines in apartment complexes — great amenity for residents, zero cost to the property, and you earn a commission. Is the property manager available?`,
-    medical: `Hey ${name}, Jaivien with More Life Vending. We help medical and dental offices offer a free vending machine for patients and staff. No upfront cost, we restock and maintain it, you earn a percentage. Is the office manager available?`,
-    dental: `Hey ${name}, Jaivien with More Life Vending. We help medical and dental offices offer a free vending machine for patients and staff. No upfront cost, we restock and maintain it, you earn a percentage. Is the office manager available?`,
+  const scripts: Record<string, string> = {
+    factory: `Hi, is the facilities manager available?\n\n[When connected]\nHey, my name's Jaivien with More Life Vending — I'll keep this under 2 minutes. We place free vending machines in factories and warehouses in ${city}. No cost to you at all — we stock it, service it, handle everything. Your team just gets a machine in the break room. If it ever doesn't work out, we remove it within 14 days. Would it be worth a quick in-person visit to see if ${biz} is a good fit?`,
+
+    warehouse: `Hi, is the facilities manager available?\n\n[When connected]\nHey, Jaivien with More Life Vending. Quick one — we set up free vending machines in warehouses in ${city}. Zero cost, we handle all stocking and maintenance, you just provide the outlet. Workers on multiple shifts actually get to eat without leaving. Would a 15-minute visit make sense to take a look at the space?`,
+
+    apartment: `Hi, is the property manager available?\n\n[When connected]\nHey, Jaivien with More Life Vending. We add free vending machines to apartment common areas — laundry rooms, lobbies, wherever your residents hang out. Zero cost to the property, we handle everything, and residents love having snacks and drinks available after hours. Would it be worth a quick visit to walk the space?`,
+
+    auto: `Hi, is the owner or manager available?\n\n[When connected]\nHey, Jaivien here with More Life Vending. Quick question — do your customers have anything to eat or drink while they're waiting on their car? We set up free vending machines in auto shops at no cost to you. Customers waiting 1-4 hours actually appreciate it, and it's a zero-hassle setup — we stock it, service it, you just provide the outlet. Worth a quick look?`,
+
+    laundromat: `Hi, is the owner available?\n\n[When connected]\nJaivien with More Life Vending — short version: we put free vending machines in laundromats. Your customers are sitting there for 45 minutes to an hour with nothing to do. Zero cost to you, we handle stocking and maintenance. Would it be worth a visit to see how it'd fit in your space?`,
+
+    gym: `Hi, is the facilities manager or owner available?\n\n[When connected]\nHey, Jaivien with More Life Vending. We place free vending machines in gyms — protein bars, sports drinks, water — all stocked and maintained by us at no cost. Members spend more and it adds real value without any work on your end. Would a quick in-person visit make sense?`,
+
+    fitness: `Hi, is the facilities manager or owner available?\n\n[When connected]\nJaivien with More Life Vending. We help fitness studios offer snacks and drinks to members at zero cost — we handle everything and you earn a percentage of every sale. Worth a quick visit to look at the space?`,
+
+    hotel: `Hi, can I speak with the facilities manager?\n\n[When connected]\nHey, Jaivien with More Life Vending. We work with hotels in ${city} to add vending machines for guests — chargers, snacks, drinks, toiletries, whatever makes sense for your property. Guests need things at 2 AM when nothing else is open. Zero cost to the hotel, we handle stocking and maintenance, you earn a percentage. Would it be worth a 15-minute conversation?`,
+
+    office: `Hi, is the facilities manager available?\n\n[When connected]\nJaivien from More Life Vending. We add free vending machines to office buildings in ${city} — employees can grab snacks and drinks without leaving the building. No cost to the property, we manage everything, and it's a simple amenity that keeps staff happy. Worth a quick visit to walk the space?`,
+
+    medical: `Hi, is the office manager or facilities manager available?\n\n[When connected]\nHey, Jaivien with More Life Vending. We place free vending machines in medical offices — for patients waiting and staff on long shifts. Zero cost, we handle all stocking and service. Worth a quick visit to take a look?`,
+
+    dental: `Hi, is the office manager available?\n\n[When connected]\nJaivien with More Life Vending. We set up free vending machines in dental offices for patients and staff. No cost to you, we handle everything. Is a quick visit worth 15 minutes of your time?`,
   };
 
-  const v = lead.vertical?.toLowerCase() || '';
-  for (const [key, script] of Object.entries(map)) {
-    if (v.includes(key)) return script;
+  for (const [key, script] of Object.entries(scripts)) {
+    if (vertical.includes(key)) return script;
   }
 
-  return `Hey ${name}, my name's Jaivien with More Life Vending. We place vending machines in businesses like yours at no cost — we stock it, maintain it, and you earn a cut of every sale just for providing the space. Is that something worth a quick 2-minute conversation?`;
+  return `Hi, is the facilities manager or owner available?\n\n[When connected]\nHey, my name's Jaivien with More Life Vending — I'll keep this under 2 minutes. We place free vending machines in businesses like ${biz} in ${city}. Zero cost to you — we stock it, service it, handle everything. You just provide the outlet. If it ever doesn't work out, we remove it within 14 days. Worth a quick in-person visit to see if you'd be a good fit?`;
 }
 
 function formatDuration(seconds: number): string {
@@ -93,6 +106,7 @@ export default function PhonePage() {
   const [activeLead, setActiveLead] = useState<PhoneLead | null>(null);
   const [callLogs, setCallLogs] = useState<Record<string, CallLog[]>>({});
   const [scriptExpanded, setScriptExpanded] = useState(false);
+  const [walkInExpanded, setWalkInExpanded] = useState(false);
   const [callNote, setCallNote] = useState('');
 
   // Twilio state
@@ -283,6 +297,38 @@ export default function PhonePage() {
     }
   }
 
+  function getWalkInScript(lead: PhoneLead): string {
+    const biz = lead.business_name || 'your business';
+    const vertical = lead.vertical?.toLowerCase() || '';
+
+    let contactTarget = 'facilities manager';
+    if (vertical.includes('apartment')) contactTarget = 'property manager';
+    if (vertical.includes('auto') || vertical.includes('laundromat')) contactTarget = 'owner';
+    if (vertical.includes('hotel')) contactTarget = 'facilities manager (not the GM)';
+    if (vertical.includes('medical') || vertical.includes('dental')) contactTarget = 'office manager';
+
+    const objections = [
+      {
+        q: '"We already have a vending company"',
+        a: 'How\'s the service been? Are employees happy with the selection and machine condition? We hear that a lot — and it usually means the current vendor isn\'t showing up consistently. When does their contract expire?'
+      },
+      {
+        q: '"We don\'t have space"',
+        a: 'Our machines fit in a 2×3 foot space — do you mind if I take a quick look? Takes 2 minutes.'
+      },
+      {
+        q: '"We\'re not interested"',
+        a: 'Totally understand. Would it be okay if I left some info and followed up in 3 months? Things change.'
+      },
+      {
+        q: '"Let me think about it"',
+        a: 'Of course — how about we do a 30-day trial? If it\'s not working, I\'ll remove it at no cost. Can we schedule a specific date to start?'
+      },
+    ];
+
+    return `TARGET: Ask for the ${contactTarget}\n\nOPENING:\n"Hi, my name is Jaivien with More Life Vending, a local vending service. I noticed ${biz} doesn't have a modern vending setup, and I think your employees would really benefit from one. We provide brand-new machines with cashless payment — completely free to you. We handle all stocking, maintenance, and service. If it ever doesn't work, we remove it within 14 days. All you'd need is a standard electrical outlet. Would you have a couple of minutes to chat?"\n\nOBJECTIONS:\n${objections.map(o => `${o.q}\n→ ${o.a}`).join('\n\n')}`;
+  }
+
   const isCalling = callingLeadId !== null && callState !== 'idle';
 
   if (loading) {
@@ -424,6 +470,23 @@ export default function PhonePage() {
                           <p className={`text-gray-200 text-sm leading-relaxed ${!scriptExpanded ? 'line-clamp-3' : ''}`}>
                             {lead.phone_script || getDefaultScript(lead)}
                           </p>
+                          {/* Walk-In Script */}
+                          <div className="mt-3">
+                            <button
+                              onClick={() => setWalkInExpanded(!walkInExpanded)}
+                              className="text-xs text-orange-400 hover:text-orange-300 flex items-center gap-1"
+                            >
+                              🚶 {walkInExpanded ? 'Hide' : 'Show'} Walk-In Script
+                            </button>
+                            {walkInExpanded && (
+                              <div className="mt-2 p-3 bg-orange-950/30 border border-orange-800/40 rounded-lg">
+                                <p className="text-xs text-orange-400 font-semibold mb-2">WALK-IN SCRIPT</p>
+                                <pre className="text-xs text-orange-100 whitespace-pre-wrap font-mono leading-relaxed">
+                                  {getWalkInScript(activeLead)}
+                                </pre>
+                              </div>
+                            )}
+                          </div>
                         </div>
 
                         {/* Research notes */}

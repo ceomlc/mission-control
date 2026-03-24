@@ -156,6 +156,7 @@ const ALL_PLATFORMS = ['tiktok', 'instagram', 'youtube', 'linkedin'];
 export default function ContentStudio() {
   const [ideas, setIdeas] = useState<ContentIdea[]>([]);
   const [trends, setTrends] = useState<ContentTrend[]>([]);
+  const [lastScouted, setLastScouted] = useState<string | null>(null);
   const [inbox, setInbox] = useState<InboxItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -198,7 +199,11 @@ export default function ContentStudio() {
       ]);
 
       setIdeas(Array.isArray(ideasData) ? ideasData : []);
-      setTrends(Array.isArray(trendsData) ? trendsData : []);
+      const allTrends = Array.isArray(trendsData) ? trendsData : [];
+      // Separate health-check rows (used for "Last scouted" timestamp) from real trends
+      const healthChecks = allTrends.filter((t: ContentTrend) => t.topic === '_health_check');
+      setLastScouted(healthChecks.length > 0 ? healthChecks[0].created_at : null);
+      setTrends(allTrends.filter((t: ContentTrend) => t.topic !== '_health_check'));
       setInbox(Array.isArray(inboxData) ? inboxData : []);
     } catch (err) {
       console.error('fetchAll error:', err);
@@ -702,7 +707,15 @@ export default function ContentStudio() {
               <div className="flex items-center gap-2">
                 <span className="text-base">🔥</span>
                 <h2 className="font-semibold text-sm">Trending Now</h2>
-                <span className="text-xs text-gray-600 ml-auto">Athena&apos;s feed</span>
+                <span className="text-xs text-gray-600 ml-auto">
+                  {lastScouted
+                    ? `Last scouted ${(() => {
+                        const diff = Date.now() - new Date(lastScouted).getTime();
+                        const h = Math.floor(diff / 3600000);
+                        return h < 1 ? 'just now' : h < 24 ? `${h}h ago` : `${Math.floor(h/24)}d ago`;
+                      })()}`
+                    : "Athena's feed"}
+                </span>
               </div>
 
               {loading ? (

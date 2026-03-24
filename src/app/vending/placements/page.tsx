@@ -27,6 +27,7 @@ export default function PlacementsPage() {
   const [placements, setPlacements] = useState<Placement[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
+  const [checklist, setChecklist] = useState<Record<string, boolean[]>>({});
 
   const handleMarkWon = async (id: string) => {
     setUpdating(id);
@@ -84,6 +85,26 @@ export default function PlacementsPage() {
     { key: 'won', label: 'Won' },
     { key: 'lost', label: 'Lost' },
   ] as const;
+
+  const CLOSING_STEPS = [
+    'Intro + rapport (match energy, connect personally before business)',
+    'Framed the demo (30-45 min, you control the structure)',
+    'Data gathering (5-10 qualifying questions asked)',
+    'Edified the offer (positioned as a no-brainer)',
+    'Isolated the motive (why do they want this NOW?)',
+    'Demo presentation (visual, specific to their location)',
+    'Test close (does this make complete sense? how do you feel?)',
+    'Closed + agreement collected',
+  ];
+
+  function toggleChecklistItem(placementId: string, index: number) {
+    setChecklist(prev => {
+      const current = prev[placementId] || Array(CLOSING_STEPS.length).fill(false);
+      const updated = [...current];
+      updated[index] = !updated[index];
+      return { ...prev, [placementId]: updated };
+    });
+  }
 
   const isMeetingToday = (date?: string) => {
     if (!date) return false;
@@ -174,6 +195,32 @@ export default function PlacementsPage() {
               {placement.notes && (
                 <p className="mt-2 text-gray-400 text-sm">{placement.notes}</p>
               )}
+
+              {/* Closing Checklist */}
+              <div className="mt-4 border-t border-[#2A2A3E] pt-3">
+                <p className="text-xs text-gray-500 mb-2 font-semibold uppercase tracking-wide">Closing Checklist</p>
+                <div className="space-y-1.5">
+                  {CLOSING_STEPS.map((step, i) => {
+                    const done = checklist[placement.id]?.[i] || false;
+                    return (
+                      <label key={i} className="flex items-start gap-2 cursor-pointer group">
+                        <input
+                          type="checkbox"
+                          checked={done}
+                          onChange={() => toggleChecklistItem(placement.id, i)}
+                          className="mt-0.5 accent-cyan-400"
+                        />
+                        <span className={`text-xs ${done ? 'line-through text-gray-600' : 'text-gray-300'}`}>
+                          {step}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <div className="mt-2 text-xs text-gray-600">
+                  {(checklist[placement.id]?.filter(Boolean).length || 0)}/{CLOSING_STEPS.length} steps completed
+                </div>
+              </div>
             </div>
           ))}
         </div>

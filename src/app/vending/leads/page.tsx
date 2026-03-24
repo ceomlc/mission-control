@@ -35,6 +35,20 @@ function getTierBadge(tier?: string) {
   return colors[tier] || 'bg-gray-700 text-gray-300';
 }
 
+function getLocationTier(vertical?: string): { tier: string; emoji: string; color: string } {
+  const v = (vertical || '').toLowerCase();
+  if (v.includes('factory') || v.includes('warehouse') || v.includes('apartment') || v.includes('auto') || v.includes('laundromat')) {
+    return { tier: 'Tier 1', emoji: '🏭', color: 'bg-green-900/50 text-green-300 border border-green-700/50' };
+  }
+  if (v.includes('office') || v.includes('hotel') || v.includes('gym') || v.includes('fitness')) {
+    return { tier: 'Tier 2', emoji: '🏢', color: 'bg-blue-900/50 text-blue-300 border border-blue-700/50' };
+  }
+  if (v.includes('hospital') || v.includes('school') || v.includes('university') || v.includes('airport') || v.includes('mall')) {
+    return { tier: 'Tier 3', emoji: '🏥', color: 'bg-gray-800 text-gray-400 border border-gray-700' };
+  }
+  return { tier: 'Tier 2', emoji: '🏢', color: 'bg-blue-900/50 text-blue-300 border border-blue-700/50' };
+}
+
 export default function LeadsPage() {
   const [activeTab, setActiveTab] = useState<'raw' | 'qualified' | 'discarded'>('qualified');
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -93,6 +107,7 @@ export default function LeadsPage() {
               <tr className="text-left text-gray-400 text-xs">
                 <th className="px-4 py-3">Business</th>
                 <th className="px-4 py-3">Vertical</th>
+                <th className="px-4 py-3">Location Tier</th>
                 <th className="px-4 py-3">Location</th>
                 <th className="px-4 py-3">Contact</th>
                 {(activeTab === 'qualified' || activeTab === 'discarded') && (
@@ -123,6 +138,16 @@ export default function LeadsPage() {
                   >
                     <td className="px-4 py-3 font-medium text-white">{lead.business_name}</td>
                     <td className="px-4 py-3">{lead.vertical}</td>
+                    <td className="px-4 py-3">
+                      {(() => {
+                        const { tier, emoji, color } = getLocationTier(lead.vertical);
+                        return (
+                          <span className={`px-2 py-0.5 rounded-full text-xs ${color}`}>
+                            {emoji} {tier}
+                          </span>
+                        );
+                      })()}
+                    </td>
                     <td className="px-4 py-3">{lead.city}, {lead.state}</td>
                     <td className="px-4 py-3">
                       {lead.contact_name || lead.email ? (
@@ -169,6 +194,14 @@ export default function LeadsPage() {
               <div>
                 <h2 className="text-xl font-bold text-white">{selectedLead.business_name}</h2>
                 <p className="text-gray-400">{selectedLead.vertical}</p>
+                {(() => {
+                  const { tier, emoji, color } = getLocationTier(selectedLead.vertical);
+                  return (
+                    <span className={`mt-1 inline-block px-2 py-0.5 rounded-full text-xs ${color}`}>
+                      {emoji} {tier}
+                    </span>
+                  );
+                })()}
               </div>
               <button
                 onClick={() => setSelectedLead(null)}

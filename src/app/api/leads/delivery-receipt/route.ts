@@ -42,7 +42,7 @@ export async function POST(request: Request) {
       // (stays out of pending queue, but not counted as sent)
       const note = `[iMessage delivery failed${error_detail ? `: ${error_detail}` : ''}]`;
       await pool.query(
-        `UPDATE leads SET notes = COALESCE(notes || ' ', '') || $2, updated_at = NOW() WHERE id = $1`,
+        `UPDATE leads SET research_notes = COALESCE(research_notes || ' ', '') || $2, updated_at = NOW() WHERE id = $1`,
         [lead_id, note]
       );
       return NextResponse.json({

@@ -51,19 +51,19 @@ export async function POST(request: Request) {
     status,
     message_drafted,
   } = body;
-  
+
   try {
     const result = await pool.query(
       `INSERT INTO leads (
         company_name, phone, address, city, state, zip, industry,
         website_url, has_website, google_rating, review_count,
-        notes, status, message_drafted, insert_source
+        research_notes, status, message_drafted, insert_source
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
       RETURNING *`,
       [
         company_name, phone, address, city, state, zip, industry,
         website_url, has_website, google_rating, review_count,
-        notes, status || 'new', message_drafted, 'mission_control'
+        notes, status || 'warm', message_drafted, 'web'
       ]
     );
     return NextResponse.json(result.rows[0]);
@@ -81,10 +81,10 @@ export async function PATCH(request: Request) {
   }
 
   const ALLOWED_COLUMNS = new Set([
-    'status', 'notes', 'phone', 'company_name', 'industry',
-    'first_name', 'variant', 'sequence_day', 'message_sent_date',
+    'status', 'research_notes', 'phone', 'company_name', 'industry',
+    'first_name', 'variant', 'case_study_ref', 'sequence_day', 'message_sent_date',
     'response_text', 'loom_url', 'call_outcome', 'updated_at',
-    'message_drafted', 'message_sent',
+    'message_drafted', 'message_sent', 'owner_name',
   ]);
 
   try {

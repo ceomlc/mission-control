@@ -37,7 +37,7 @@ export async function POST(
       return NextResponse.json({ error: 'Lead has no phone number' }, { status: 400 });
     }
 
-    const firstName = lead.contact_name?.split(' ')[0] || lead.company_name?.split(' ')[0] || 'there';
+    const firstName = lead.owner_name?.split(' ')[0] || lead.company_name?.split(' ')[0] || 'there';
     const company = lead.company_name || 'your business';
 
     const message = `Hey ${firstName} — you said YES so I put ${company}'s site together.\n\nHere's a quick walkthrough: ${lead.loom_url}\n\nSite is ready to go live. Want to move forward?\n\n— Jaivien`;

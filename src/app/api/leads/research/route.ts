@@ -93,9 +93,9 @@ export async function POST(request: Request) {
               has_website: !!result.website,
               google_rating: result.rating || null,
               review_count: result.user_ratings_total || 0,
-              status: 'researched',
+              status: 'warm',
               source: 'google_maps_automated',
-              notes: `Google Maps: ${result.formatted_address}`,
+              research_notes: `Google Maps: ${result.formatted_address}`,
               // Additional research fields
               google_presence: result.rating 
                 ? `${result.rating} stars, ${result.user_ratings_total || 0} reviews, in map pack`
@@ -108,18 +108,33 @@ export async function POST(request: Request) {
       }
     }
 
-    // De-duplicate
-    const unique = results.filter((v, i, a) => a.findIndex(t => t.company_name.toLowerCase() === t.company_name.toLowerCase()) === i);
+    // De-duplicate by normalized 10-digit phone first, then company name fallback
+    const seen = new Set<string>();
+    const unique = results.filter(v => {
+      const digits = (v.phone || '').replace(/\D/g, '');
+      const key = digits.length >= 10
+        ? digits.slice(-10)
+        : v.company_name.toLowerCase().replace(/\s+/g, '');
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    // Normalize phone numbers to 10-digit format before DB insert
+    for (const lead of unique) {
+      const digits = (lead.phone || '').replace(/\D/g, '');
+      lead.phone = digits.length >= 10 ? digits.slice(-10) : digits;
+    }
 
     // Insert into database
     let added = 0;
     for (const lead of unique.slice(0, limit)) {
       try {
         await pool.query(
-          `INSERT INTO leads (company_name, phone, city, state, industry, website_url, has_website, google_rating, review_count, status, source, notes, google_presence)
+          `INSERT INTO leads (company_name, phone, city, state, industry, website_url, has_website, google_rating, review_count, status, source, research_notes, google_presence)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
            ON CONFLICT DO NOTHING`,
-          [lead.company_name, lead.phone, lead.city, lead.state, lead.industry, lead.website_url, lead.has_website, lead.google_rating, lead.review_count, lead.status, lead.source, lead.notes, lead.google_presence]
+          [lead.company_name, lead.phone, lead.city, lead.state, lead.industry, lead.website_url, lead.has_website, lead.google_rating, lead.review_count, lead.status, lead.source, lead.research_notes, lead.google_presence]
         );
         added++;
       } catch (e) {

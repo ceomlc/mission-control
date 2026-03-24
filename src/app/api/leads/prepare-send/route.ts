@@ -66,18 +66,28 @@ export async function POST(request: Request) {
       ? ['a1', 'b1', 'a2', 'b2']
       : ['a3', 'b3', 'a4', 'b4'];
 
+    // Map letter variants to DB enum (script_1-4). Full letter variant stored in case_study_ref.
+    const variantToEnum: Record<string, string> = {
+      a1: 'script_1', b1: 'script_1',
+      a2: 'script_2', b2: 'script_2',
+      a3: 'script_3', b3: 'script_3',
+      a4: 'script_4', b4: 'script_4',
+    };
+
     // Pre-assigned rotation: A1, B1, A2, B2, A1, B1, A2, B2...
     // Guarantees even distribution regardless of batch size
     for (let i = 0; i < leadsToUpdate.length; i++) {
       const lead = leadsToUpdate[i];
-      const variant = activePair[i % activePair.length];
+      const letterVariant = activePair[i % activePair.length];
+      const enumVariant = variantToEnum[letterVariant] || 'script_1';
       await pool.query(
         `UPDATE leads SET
           status = 'pending_approval',
           variant = COALESCE(variant, $2),
+          case_study_ref = COALESCE(case_study_ref, $3),
           updated_at = CURRENT_TIMESTAMP
         WHERE id = $1`,
-        [lead.id, variant]
+        [lead.id, enumVariant, letterVariant]
       );
     }
 

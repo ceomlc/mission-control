@@ -63,7 +63,7 @@ function assignVariant(pair: string[]): string {
 }
 
 function generateMessage(lead: any, variant: string): string {
-  const firstName = lead.contact_name?.split(' ')[0] || lead.company_name?.split(' ')[0] || 'there';
+  const firstName = lead.owner_name?.split(' ')[0] || 'there';
   const company = lead.company_name || 'your business';
   const industry = lead.industry || 'trade';
   const city = lead.city || 'Baltimore';
@@ -122,23 +122,44 @@ export async function POST() {
       }
     }
 
-    // Now generate messages for leads without a website only
+    // Now generate messages for no-website leads that don't have a drafted message yet
+    // Status must not be already in the outreach or terminal pipeline
     const result = await pool.query(
-      "SELECT * FROM leads WHERE (has_website = false OR has_website = 0) AND status IN ('new', 'researched', 'drafted')"
+      `SELECT * FROM leads
+       WHERE has_website = false
+         AND (message_drafted IS NULL OR message_drafted = '')
+         AND status NOT IN ('sent', 'cold', 'opted_out', 'bad_data', 'hot', 'replied', 'waiting_on_loom', 'pending_approval', 'approved')`
     );
 
     let generated = 0;
     const pair = getActiveTestPair();
 
+    // Map a1-b4 letter variants to the DB enum (script_1-4) for KPI compatibility.
+    // The full letter variant (a1, b1, etc.) is stored in case_study_ref for A/B analysis.
+    const variantToEnum: Record<string, string> = {
+      a1: 'script_1', b1: 'script_1',
+      a2: 'script_2', b2: 'script_2',
+      a3: 'script_3', b3: 'script_3',
+      a4: 'script_4', b4: 'script_4',
+    };
+
     for (const lead of result.rows) {
-      const variant = assignVariant(pair);
-      const message = generateMessage(lead, variant);
+      const letterVariant = assignVariant(pair);
+      const enumVariant = variantToEnum[letterVariant] || 'script_1';
+      const message = generateMessage(lead, letterVariant);
 
       await pool.query(
-        "UPDATE leads SET message_drafted = $1, status = 'drafted', variant = $2, sequence_day = 1, updated_at = CURRENT_TIMESTAMP WHERE id = $3",
-        [message, variant, lead.id]
+        `UPDATE leads SET
+           message_drafted = $1,
+           variant = $2,
+           case_study_ref = $3,
+           sequence_day = 1,
+           updated_at = CURRENT_TIMESTAMP
+         WHERE id = $4`,
+        [message, enumVariant, letterVariant, lead.id]
       );
       generated++;
+
     }
 
     return NextResponse.json({

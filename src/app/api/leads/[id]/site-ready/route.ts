@@ -29,10 +29,10 @@ export async function POST(
       return NextResponse.json({ error: 'Lead is not in hot status' }, { status: 400 });
     }
 
-    // Append site URL to notes
+    // Append site URL to research_notes
     const siteNote = `[SITE READY: ${preview_url}]`;
     await pool.query(
-      `UPDATE leads SET notes = COALESCE(notes || ' ', '') || $1, updated_at = NOW() WHERE id = $2`,
+      `UPDATE leads SET research_notes = COALESCE(research_notes || ' ', '') || $1, updated_at = NOW() WHERE id = $2`,
       [siteNote, leadId]
     );
 
