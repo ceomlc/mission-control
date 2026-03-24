@@ -197,14 +197,14 @@ export default function KPIPage() {
       {/* Activity counters — raw pipeline numbers                           */}
       {/* ------------------------------------------------------------------ */}
       <section>
-        <h2 className="text-lg font-semibold mb-3" style={{ color: '#E8E0D0' }}>Outreach Activity</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <h2 className="text-lg font-semibold mb-1" style={{ color: '#E8E0D0' }}>In-Sequence</h2>
+        <p className="text-xs mb-3" style={{ color: '#E8E0D0', opacity: 0.5 }}>Leads that have been sent — these add up to your active pipeline</p>
+        <div className="grid grid-cols-3 gap-4 mb-2">
           {[
-            { label: 'iMessage Confirmed', value: summary.messages_sent,  icon: '✅', color: '#22c55e', tooltip: 'Delivery confirmed by Athena relay' },
-            { label: 'Relay Pending',      value: summary.relay_pending,   icon: '📡', color: '#f97316', tooltip: 'Sent to relay, awaiting iMessage confirmation' },
-            { label: 'Replied',            value: summary.total_replied,   icon: '💬', color: '#a855f7', tooltip: null },
-            { label: 'Pending Queue',      value: summary.queue_depth,     icon: '⏳', color: '#f59e0b', tooltip: null },
-          ].map(({ label, value, icon, color }) => (
+            { label: 'iMessage Confirmed', value: summary.messages_sent, icon: '✅', color: '#22c55e', sub: 'Delivery confirmed by relay' },
+            { label: 'Relay Pending',      value: summary.relay_pending,  icon: '📡', color: '#f97316', sub: 'Sent, awaiting delivery receipt' },
+            { label: 'Replied',            value: summary.total_replied,  icon: '💬', color: '#a855f7', sub: 'Responded to your message' },
+          ].map(({ label, value, icon, color, sub }) => (
             <div
               key={label}
               className="rounded-xl p-4 flex flex-col gap-1"
@@ -212,9 +212,23 @@ export default function KPIPage() {
             >
               <span className="text-2xl">{icon}</span>
               <span className="text-3xl font-bold" style={{ color }}>{value}</span>
-              <span className="text-xs" style={{ color: '#E8E0D0' }}>{label}</span>
+              <span className="text-xs font-medium" style={{ color: '#E8E0D0' }}>{label}</span>
+              <span className="text-xs" style={{ color: '#E8E0D0', opacity: 0.5 }}>{sub}</span>
             </div>
           ))}
+        </div>
+        <div className="text-xs mb-8 px-1" style={{ color: '#E8E0D0', opacity: 0.4 }}>
+          Total in-sequence: {summary.messages_sent + summary.relay_pending + summary.total_replied}
+        </div>
+
+        <div className="rounded-xl p-4 flex items-center gap-4 mb-8"
+          style={{ background: '#1A1A2E', border: '1px solid #f59e0b40' }}>
+          <span className="text-3xl">⏳</span>
+          <div>
+            <div className="text-3xl font-bold" style={{ color: '#f59e0b' }}>{summary.queue_depth}</div>
+            <div className="text-sm font-medium" style={{ color: '#E8E0D0' }}>Approval Queue</div>
+            <div className="text-xs" style={{ color: '#E8E0D0', opacity: 0.5 }}>Fresh leads staged by Thoth — not yet sent, separate from the pipeline above</div>
+          </div>
         </div>
       </section>
 

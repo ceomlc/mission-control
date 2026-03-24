@@ -38,7 +38,15 @@ export async function POST(
 
     const outreach = rows[0];
 
-    // ── 2. Guard: must have recipient email ────────────────────────────────
+    // ── 2a. Guard: already sent — refuse duplicate send ───────────────────
+    if (outreach.first_contact_sent_at) {
+      return NextResponse.json(
+        { error: `Already sent to ${outreach.business_name} on ${new Date(outreach.first_contact_sent_at).toLocaleDateString()}. Refusing duplicate send.` },
+        { status: 409 }
+      );
+    }
+
+    // ── 2b. Guard: must have recipient email ───────────────────────────────
     if (!outreach.email) {
       return NextResponse.json(
         { error: `No email on file for ${outreach.business_name}. Add an email to the lead first.` },
@@ -50,8 +58,7 @@ export async function POST(
     const { rows: [cap] } = await pool.query(
       `SELECT COUNT(*)::int AS sent_today
        FROM vending_outreach
-       WHERE status = 'approved'
-         AND first_contact_sent_at >= CURRENT_DATE`
+       WHERE first_contact_sent_at >= CURRENT_DATE`
     );
 
     if (cap.sent_today >= DAILY_CAP) {
@@ -74,7 +81,7 @@ export async function POST(
     // ── 5. Mark as approved + record send time ─────────────────────────────
     const { rows: updated } = await pool.query(
       `UPDATE vending_outreach
-       SET status = 'approved',
+       SET status = 'active',
            approved_at = NOW(),
            first_contact_sent_at = NOW(),
            updated_at = NOW()

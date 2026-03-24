@@ -114,7 +114,9 @@ export default function OutreachPage() {
     try {
       const res = await fetch(`/api/vending/outreach/${id}/reject`, { method: 'POST' });
       if (res.ok) {
+        // Remove from both queues — no-email discards show in noEmailLeads, not pendingApproval
         setPendingApproval(prev => prev.filter(item => item.id !== id));
+        setNoEmailLeads(prev => prev.filter(item => item.id !== id));
       }
     } catch (error) {
       console.error('Failed to reject:', error);
