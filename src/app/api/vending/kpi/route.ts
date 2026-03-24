@@ -6,6 +6,23 @@ function safe(num: number, den: number) {
   return den === 0 ? 0 : num / den;
 }
 
+type VariantRow = { variant: string; sends: number; replies: number };
+function detectWinner(rows: VariantRow[]): Record<string, any> {
+  const a = rows.find(r => r.variant === 'a');
+  const b = rows.find(r => r.variant === 'b');
+  if (!a && !b) return { status: 'no_data' };
+  if (!a || !b) return { status: 'insufficient_data' };
+  if (a.sends < 20 || b.sends < 20) {
+    return { status: 'building', needed: Math.max(20 - a.sends, 20 - b.sends) };
+  }
+  const rateA = a.replies / a.sends;
+  const rateB = b.replies / b.sends;
+  const diff = Math.abs(rateA - rateB);
+  if (diff < 0.05) return { status: 'tie', diff };
+  const winner = rateA >= rateB ? 'A' : 'B';
+  return { status: 'winner', winner, margin: `${(diff * 100).toFixed(1)}%` };
+}
+
 export async function GET() {
   try {
     const client = await pool.connect();
@@ -82,7 +99,44 @@ export async function GET() {
         ORDER BY touch
       `);
 
-      return NextResponse.json({ summary, splits, touch_performance: touchRows });
+      // ── Per-facility-type A/B splits with winner logic ────────────────────
+      const { rows: facilityRows } = await client.query(`
+        SELECT
+          l.vertical,
+          COALESCE(o.variant, 'a')                                                          AS variant,
+          COUNT(*) FILTER (WHERE o.first_contact_sent_at IS NOT NULL)::int                  AS sends,
+          COUNT(*) FILTER (WHERE o.reply_received_at IS NOT NULL
+                             AND o.status::text != 'bounced')::int                          AS replies
+        FROM vending_outreach o
+        JOIN vending_leads l ON o.lead_id = l.id
+        WHERE o.first_contact_sent_at IS NOT NULL
+        GROUP BY l.vertical, o.variant
+        ORDER BY l.vertical, o.variant
+      `);
+
+      // Group by vertical, run winner detection per vertical
+      const verticalMap: Record<string, VariantRow[]> = {};
+      for (const row of facilityRows) {
+        if (!verticalMap[row.vertical]) verticalMap[row.vertical] = [];
+        verticalMap[row.vertical].push({ variant: row.variant, sends: row.sends, replies: row.replies });
+      }
+
+      const facilityResults = Object.entries(verticalMap).map(([vertical, rows]) => {
+        const a = rows.find(r => r.variant === 'a') ?? { variant: 'a', sends: 0, replies: 0 };
+        const b = rows.find(r => r.variant === 'b') ?? { variant: 'b', sends: 0, replies: 0 };
+        return {
+          vertical,
+          a_sends:     a.sends,
+          a_replies:   a.replies,
+          a_reply_rate: safe(a.replies, a.sends),
+          b_sends:     b.sends,
+          b_replies:   b.replies,
+          b_reply_rate: safe(b.replies, b.sends),
+          winner:      detectWinner(rows),
+        };
+      });
+
+      return NextResponse.json({ summary, splits, touch_performance: touchRows, facility_results: facilityResults });
     } finally {
       client.release();
     }

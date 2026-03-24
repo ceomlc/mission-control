@@ -21,7 +21,7 @@ interface Lead {
   message_drafted: string;
   message_sent_date?: string;
   source: string;
-  notes: string;
+  research_notes: string;
   created_at: string;
   loom_url?: string;
   // Research fields
@@ -221,6 +221,12 @@ export default function LeadsPage() {
 
   const handleSendIMessage = async (lead: Lead) => {
     setSendingLeadId(lead.id);
+
+    // Optimistically mark as sent in local state immediately — this removes the lead
+    // from the Outreach Queue section AND the table Send button before the network
+    // request completes, making it impossible to double-click and double-send.
+    setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, status: 'sent' } : l));
+
     try {
       const res = await fetch('/api/leads/send-imessage', {
         method: 'POST',
@@ -231,10 +237,14 @@ export default function LeadsPage() {
       if (res.ok && data.success) {
         showToast(`iMessage sent to ${lead.company_name}!`, 'success');
       } else {
+        // Revert the optimistic update on failure so lead returns to queue
+        setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, status: 'pending_approval' } : l));
         showToast(`Send failed: ${data.error || 'Unknown error'}`, 'error');
       }
       fetchLeads();
     } catch (error) {
+      // Revert on network error too
+      setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, status: 'pending_approval' } : l));
       console.error('Send error', error);
       showToast('Send failed: ' + error, 'error');
     } finally {
@@ -677,8 +687,8 @@ export default function LeadsPage() {
                 <p className="text-sm text-gray-500 font-medium">📋 Log Outreach Data</p>
 
                 {/* Site Ready for Review */}
-                {selectedLead.status === 'hot' && selectedLead.notes?.includes('[SITE READY:') && (() => {
-                  const siteUrl = selectedLead.notes.match(/\[SITE READY: ([^\]]+)\]/)?.[1];
+                {selectedLead.status === 'hot' && selectedLead.research_notes?.includes('[SITE READY:') && (() => {
+                  const siteUrl = selectedLead.research_notes.match(/\[SITE READY: ([^\]]+)\]/)?.[1];
                   return (
                     <div style={{ border: '1px solid #f59e0b', borderRadius: 8, padding: '12px 16px', marginBottom: 12, background: 'rgba(245,158,11,0.08)' }}>
                       <div style={{ color: '#f59e0b', fontWeight: 700, marginBottom: 6 }}>🔥 Site Ready for Review</div>
@@ -714,7 +724,7 @@ export default function LeadsPage() {
                       Save
                     </button>
                   </div>
-                  {selectedLead.status === 'hot' && selectedLead.notes?.includes('[SITE READY:') && (
+                  {selectedLead.status === 'hot' && selectedLead.research_notes?.includes('[SITE READY:') && (
                     <button
                       onClick={() => handleSendLoom(selectedLead.id)}
                       disabled={!selectedLead.loom_url && !loomInput}

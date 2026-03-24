@@ -1,6 +1,23 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+
+interface FacilityResult {
+  vertical: string;
+  a_sends: number;
+  a_replies: number;
+  a_reply_rate: number;
+  b_sends: number;
+  b_replies: number;
+  b_reply_rate: number;
+  winner: {
+    status: 'winner' | 'tie' | 'building' | 'insufficient_data' | 'no_data';
+    winner?: string;
+    margin?: string;
+    needed?: number;
+    diff?: number;
+  };
+}
 
 interface KpiData {
   summary: {
@@ -29,6 +46,7 @@ interface KpiData {
     sample_status: 'sufficient' | 'building' | 'too_early';
   }>;
   touch_performance: Array<{ touch: string; replies: number }>;
+  facility_results: FacilityResult[];
 }
 
 function pct(n: number) {
@@ -57,7 +75,7 @@ export default function VendingKpiPage() {
   if (error)   return <div className="text-red-400 p-8">Error: {error}</div>;
   if (!data)   return null;
 
-  const { summary, splits, touch_performance } = data;
+  const { summary, splits, touch_performance, facility_results = [] } = data;
   const maxTouchReplies = Math.max(...touch_performance.map(t => t.replies), 1);
 
   return (
@@ -193,6 +211,69 @@ export default function VendingKpiPage() {
               </span>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* Facility Type Results */}
+      <section>
+        <h2 className="text-lg font-semibold text-white mb-1">Facility Type Results</h2>
+        <p className="text-gray-500 text-sm mb-4">
+          Winner declared after 20+ sends per variant per facility type. 5% reply rate gap required.
+        </p>
+        <div className="bg-[#1A1A2E] border border-[#2A2A3E] rounded-xl overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="border-b border-[#2A2A3E]">
+              <tr className="text-left text-gray-400 text-xs">
+                <th className="px-4 py-3">Vertical</th>
+                <th className="px-4 py-3">A Sends</th>
+                <th className="px-4 py-3">A Reply%</th>
+                <th className="px-4 py-3">B Sends</th>
+                <th className="px-4 py-3">B Reply%</th>
+                <th className="px-4 py-3">Status</th>
+              </tr>
+            </thead>
+            <tbody className="text-gray-300">
+              {facility_results.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                    No facility data yet — results appear after first sends
+                  </td>
+                </tr>
+              ) : facility_results.map(row => {
+                const w = row.winner;
+                let statusEl: React.ReactNode;
+                if (w.status === 'winner') {
+                  const color = w.winner === 'A' ? 'text-cyan-300' : 'text-purple-300';
+                  statusEl = <span className={`font-semibold ${color}`}>🏆 {w.winner} wins (+{w.margin})</span>;
+                } else if (w.status === 'tie') {
+                  statusEl = <span className="text-yellow-400">⚖️ Too close — tied</span>;
+                } else if (w.status === 'building') {
+                  statusEl = <span className="text-gray-400">🔨 Building ({w.needed} more needed)</span>;
+                } else {
+                  statusEl = <span className="text-gray-600">⏳ Not enough data</span>;
+                }
+
+                return (
+                  <tr key={row.vertical} className="border-b border-[#2A2A3E]">
+                    <td className="px-4 py-3 text-white font-medium capitalize">{row.vertical}</td>
+                    <td className="px-4 py-3">
+                      <span className="text-cyan-300 font-mono">{row.a_sends}</span>
+                    </td>
+                    <td className="px-4 py-3 font-semibold">
+                      {row.a_sends > 0 ? pct(row.a_reply_rate) : '—'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-purple-300 font-mono">{row.b_sends}</span>
+                    </td>
+                    <td className="px-4 py-3 font-semibold">
+                      {row.b_sends > 0 ? pct(row.b_reply_rate) : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-sm">{statusEl}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </section>
     </div>
