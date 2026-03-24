@@ -89,6 +89,9 @@ export default function OutreachPage() {
 
   const [expandedSequence, setExpandedSequence] = useState<string | null>(null);
   const [approveError, setApproveError] = useState<string | null>(null);
+  const [discardingAll, setDiscardingAll] = useState(false);
+  const [findingEmails, setFindingEmails] = useState(false);
+  const [findEmailsResult, setFindEmailsResult] = useState<{ found: number; checked: number; hunter_available: boolean } | null>(null);
 
   const handleApprove = async (id: string) => {
     setApproving(id);
@@ -125,6 +128,47 @@ export default function OutreachPage() {
     }
   };
 
+  const handleDiscardAll = async () => {
+    if (!confirm(`Permanently discard all ${noEmailLeads.length} no-email drafts? This cannot be undone.`)) return;
+    setDiscardingAll(true);
+    try {
+      const res = await fetch('/api/vending/outreach/bulk-discard', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+      if (res.ok) {
+        setNoEmailLeads([]);
+        setShowNoEmail(false);
+      }
+    } catch (error) {
+      console.error('Failed to discard all:', error);
+    } finally {
+      setDiscardingAll(false);
+    }
+  };
+
+  const handleFindEmails = async () => {
+    setFindingEmails(true);
+    setFindEmailsResult(null);
+    try {
+      const res = await fetch('/api/vending/outreach/find-emails', { method: 'POST' });
+      const data = await res.json();
+      setFindEmailsResult(data);
+      if (data.found > 0) {
+        // Leads with newly found emails are now in the approval queue — re-fetch everything
+        const [pendingRes, noEmailRes] = await Promise.all([
+          fetch('/api/vending/outreach?status=draft,pending_approval'),
+          fetch('/api/vending/outreach?no_email=true'),
+        ]);
+        const pendingData = await pendingRes.json();
+        const noEmailData = await noEmailRes.json();
+        setPendingApproval(pendingData.outreach || []);
+        setNoEmailLeads(noEmailData.outreach || []);
+      }
+    } catch (error) {
+      console.error('Failed to find emails:', error);
+    } finally {
+      setFindingEmails(false);
+    }
+  };
+
   if (loading) {
     return <div className="text-gray-400">Loading...</div>;
   }
@@ -136,19 +180,55 @@ export default function OutreachPage() {
       {/* No Email Warning */}
       {noEmailLeads.length > 0 && (
         <div className="bg-red-950/40 border border-red-500/40 rounded-xl px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className="text-red-400 font-semibold text-sm">
-                ⚠️ {noEmailLeads.length} draft{noEmailLeads.length !== 1 ? 's' : ''} have no email on file — removed from approval queue
-              </span>
+          {/* Header row */}
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-red-400 font-semibold text-sm">
+              ⚠️ {noEmailLeads.length} draft{noEmailLeads.length !== 1 ? 's' : ''} have no email on file
+            </span>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {/* Find Emails button */}
+              <button
+                onClick={handleFindEmails}
+                disabled={findingEmails}
+                className="text-xs bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded px-3 py-1.5 font-medium"
+              >
+                {findingEmails ? '🔍 Searching…' : '🔍 Find Emails'}
+              </button>
+              {/* Discard All button */}
+              <button
+                onClick={handleDiscardAll}
+                disabled={discardingAll}
+                className="text-xs bg-red-700 hover:bg-red-600 disabled:opacity-50 text-white rounded px-3 py-1.5 font-medium"
+              >
+                {discardingAll ? 'Discarding…' : 'Discard All'}
+              </button>
+              {/* Show/Hide toggle */}
+              <button
+                onClick={() => setShowNoEmail(v => !v)}
+                className="text-xs text-red-400 hover:text-red-200 underline"
+              >
+                {showNoEmail ? 'Hide' : 'Show'} →
+              </button>
             </div>
-            <button
-              onClick={() => setShowNoEmail(v => !v)}
-              className="text-xs text-red-400 hover:text-red-200 underline"
-            >
-              {showNoEmail ? 'Hide' : 'Show'} →
-            </button>
           </div>
+
+          {/* Find emails result banner */}
+          {findEmailsResult && (
+            <div className="mt-2 text-xs rounded px-3 py-2 bg-[#1A1A2E]">
+              {findEmailsResult.found > 0 ? (
+                <span className="text-green-400">
+                  ✅ Found {findEmailsResult.found} email{findEmailsResult.found !== 1 ? 's' : ''} out of {findEmailsResult.checked} searched — moved to Approval Queue
+                </span>
+              ) : (
+                <span className="text-yellow-400">
+                  No emails found for {findEmailsResult.checked} lead{findEmailsResult.checked !== 1 ? 's' : ''}.
+                  {!findEmailsResult.hunter_available && ' Add HUNTER_API_KEY to Vercel env for deeper searching.'}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Individual lead list */}
           {showNoEmail && (
             <div className="mt-3 space-y-2">
               {noEmailLeads.map(item => (
