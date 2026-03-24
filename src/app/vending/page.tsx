@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import pool from '@/lib/vending-db';
 
 interface Stats {
   totalLeads: number;
@@ -18,11 +19,51 @@ interface Stats {
 
 async function getStats(): Promise<Stats> {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-    const res = await fetch(`${baseUrl}/api/vending/stats`, { cache: 'no-store' });
-    if (!res.ok) throw new Error('Failed to fetch');
-    return res.json();
-  } catch {
+    const result = await pool.query(`
+      SELECT
+        (SELECT COUNT(*)::int FROM vending_leads) AS total_leads,
+        (SELECT COUNT(*)::int FROM vending_leads
+         WHERE created_at >= date_trunc('week', NOW())) AS leads_this_week,
+        (SELECT COUNT(*)::int FROM vending_outreach
+         WHERE status::text IN ('draft', 'pending_approval')) AS pending_approval_count,
+        (SELECT COUNT(*)::int FROM vending_outreach
+         WHERE first_contact_sent_at IS NOT NULL
+           AND status::text NOT IN ('rejected', 'discarded', 'closed_won', 'opted_out')) AS active_sequences_count,
+        (SELECT COUNT(*)::int FROM vending_outreach
+         WHERE first_contact_sent_at IS NOT NULL) AS total_sent,
+        (SELECT COUNT(*)::int FROM vending_outreach
+         WHERE first_contact_sent_at >= CURRENT_DATE) AS sent_today,
+        (SELECT COUNT(*)::int FROM vending_outreach
+         WHERE reply_received_at IS NOT NULL
+            OR status::text IN ('replied', 'interested')) AS reply_count,
+        (SELECT COUNT(*)::int FROM vending_placements
+         WHERE status::text = 'pipeline') AS meetings_booked,
+        (SELECT COUNT(*)::int FROM vending_placements
+         WHERE status::text = 'closed_won') AS placements_closed_won,
+        (SELECT COUNT(*)::int FROM vending_leads WHERE tier::text = 'A') AS a_tier_count,
+        (SELECT COUNT(*)::int FROM vending_leads WHERE tier::text = 'B') AS b_tier_count,
+        (SELECT COUNT(*)::int FROM vending_leads WHERE tier::text = 'C') AS c_tier_count
+    `);
+    const row = result.rows[0];
+    const totalSent = row.total_sent || 1;
+    const replyCount = row.reply_count || 0;
+    return {
+      totalLeads:           row.total_leads,
+      leadsThisWeek:        row.leads_this_week,
+      pendingApprovalCount: row.pending_approval_count,
+      activeSequencesCount: row.active_sequences_count,
+      sentToday:            row.sent_today,
+      totalSent:            row.total_sent,
+      replyCount,
+      replyRate:            Math.round((replyCount / totalSent) * 100),
+      meetingsBooked:       row.meetings_booked,
+      placementsClosedWon:  row.placements_closed_won,
+      aTierCount:           row.a_tier_count,
+      bTierCount:           row.b_tier_count,
+      cTierCount:           row.c_tier_count,
+    };
+  } catch (e) {
+    console.error('getStats error:', e);
     return {
       totalLeads: 0, leadsThisWeek: 0, pendingApprovalCount: 0,
       activeSequencesCount: 0, sentToday: 0, totalSent: 0,
@@ -34,12 +75,13 @@ async function getStats(): Promise<Stats> {
 
 async function getRecentLeads() {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-    // Show most recent 10 leads regardless of date
-    const res = await fetch(`${baseUrl}/api/vending/leads?limit=10`, { cache: 'no-store' });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return data.leads || [];
+    const { rows } = await pool.query(`
+      SELECT id, business_name, vertical, city, state, tier
+      FROM vending_leads
+      ORDER BY created_at DESC
+      LIMIT 10
+    `);
+    return rows;
   } catch {
     return [];
   }
@@ -47,11 +89,15 @@ async function getRecentLeads() {
 
 async function getPendingApprovals() {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-    const res = await fetch(`${baseUrl}/api/vending/outreach?status=draft`, { cache: 'no-store' });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return data.outreach?.slice(0, 5) || [];
+    const { rows } = await pool.query(`
+      SELECT o.id, l.business_name, l.city, l.state, l.tier
+      FROM vending_outreach o
+      JOIN vending_leads l ON o.lead_id = l.id
+      WHERE o.status::text IN ('draft', 'pending_approval')
+      ORDER BY o.created_at DESC
+      LIMIT 5
+    `);
+    return rows;
   } catch {
     return [];
   }
@@ -138,7 +184,7 @@ export default async function VendingPage() {
 
           {recentLeads.length === 0 ? (
             <div className="text-gray-400 text-sm text-center py-8">
-              No leads yet. Run Scout to add leads.
+              No leads yet. Scout runs every 4 hours to add leads.
             </div>
           ) : (
             <div className="space-y-2">
