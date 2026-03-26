@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 const tabs = [
   { href: '/kpi',         label: 'Leads',   icon: '📱' },
   { href: '/kpi/vending', label: 'Vending', icon: '🏧' },
+  { href: '/kpi/jobs',    label: 'Jobs',    icon: '💼' },
 ];
 
 export default function KpiLayout({ children }: { children: React.ReactNode }) {
