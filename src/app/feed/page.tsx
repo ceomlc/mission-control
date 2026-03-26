@@ -53,7 +53,7 @@ export default function FeedPage() {
 
   const getColor = (type: string) => {
     switch (type) {
-      case 'lead':    return 'border-cyan-500/40 text-cyan-300';
+      case 'lead':    return 'border-[#DC2626]/40 text-[#DC2626]';
       case 'job':     return 'border-blue-500/40 text-blue-300';
       case 'content': return 'border-purple-500/40 text-purple-300';
       default:        return 'border-gray-500/30 text-gray-400';
@@ -62,7 +62,7 @@ export default function FeedPage() {
 
   const getBorderColor = (type: string) => {
     switch (type) {
-      case 'lead':    return 'border-l-cyan-500/60';
+      case 'lead':    return 'border-l-[#DC2626]/60';
       case 'job':     return 'border-l-blue-500/60';
       case 'content': return 'border-l-purple-500/60';
       default:        return 'border-l-gray-500/40';
@@ -87,7 +87,7 @@ export default function FeedPage() {
           {activities.map((activity, index) => (
             <div
               key={index}
-              className={`bg-[#1A1A2E] rounded-lg p-4 border-l-4 ${getBorderColor(activity.type)}`}
+              className={`bg-[#141414] rounded-lg p-4 border-l-4 ${getBorderColor(activity.type)}`}
             >
               <div className="flex items-center gap-3">
                 <span className="text-xl">{getIcon(activity.type)}</span>
@@ -100,7 +100,7 @@ export default function FeedPage() {
                   </div>
                 </div>
                 {activity.meta && (
-                  <span className="text-xs px-2 py-0.5 rounded bg-[#0A0A0F] text-gray-500 border border-[#2A2A3E] flex-shrink-0">
+                  <span className="text-xs px-2 py-0.5 rounded bg-[#0D0D0D] text-gray-500 border border-[#252525] flex-shrink-0">
                     {activity.meta}
                   </span>
                 )}

@@ -1,9 +1,8 @@
 {
   "regions": ["sfo1"],
   "crons": [
-    {
-      "path": "/api/vending/scout",
-      "schedule": "0 */4 * * *"
-    }
+    { "path": "/api/vending/scout",       "schedule": "0 */4 * * *" },
+    { "path": "/api/cron/leads-generate", "schedule": "0 11 * * *"  },
+    { "path": "/api/cron/leads-prepare",  "schedule": "0 12 * * *"  }
   ]
 }

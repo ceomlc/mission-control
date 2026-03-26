@@ -494,7 +494,7 @@ export default function AgentsPage() {
             className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
               calibrationMode
                 ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30"
-                : "bg-[#1A1A2E] text-gray-500 hover:text-gray-300"
+                : "bg-[#141414] text-gray-500 hover:text-gray-300"
             }`}
           >
             {calibrationMode ? "🔧 Calibrating" : "🔧 Calibrate"}
@@ -504,7 +504,7 @@ export default function AgentsPage() {
             className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
               simulationOn
                 ? "bg-green-500/20 text-green-400 border border-green-500/30"
-                : "bg-[#1A1A2E] text-gray-400 hover:text-white"
+                : "bg-[#141414] text-gray-400 hover:text-white"
             }`}
           >
             {simulationOn ? "⏸ Simulation ON" : "▶ Simulation OFF"}
@@ -530,7 +530,7 @@ export default function AgentsPage() {
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
                 isActive
                   ? "text-white"
-                  : "bg-[#1A1A2E] text-gray-400 hover:text-white border border-[#2A2A3E]"
+                  : "bg-[#141414] text-gray-400 hover:text-white border border-[#252525]"
               }`}
               style={isActive ? { background: `${tabColor}22`, border: `1px solid ${tabColor}55`, color: tabColor } : {}}
             >
@@ -743,13 +743,13 @@ export default function AgentsPage() {
       </div>
 
       {/* Status Bar */}
-      <div className="flex items-center justify-center gap-8 bg-[#1A1A2E] border border-[#2A2A3E] rounded-lg px-6 py-3">
+      <div className="flex items-center justify-center gap-8 bg-[#141414] border border-[#252525] rounded-lg px-6 py-3">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse" />
           <span className="text-white font-semibold text-sm">{tabLiveCount(activeTab)}</span>
           <span className="text-green-400 text-sm font-medium">Live</span>
         </div>
-        <div className="w-px h-4 bg-[#2A2A3E]" />
+        <div className="w-px h-4 bg-[#333333]" />
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.5)]" />
           <span className="text-white font-semibold text-sm">{activeCount}</span>
@@ -777,7 +777,7 @@ export default function AgentsPage() {
               agent.status === "chatting" ? "#a855f7" :
               "#6b7280";
             return (
-              <div key={agent.id} className={`bg-[#1A1A2E] border rounded-lg p-3 ${liveAgentIds.has(agent.id) ? 'border-green-500/40' : 'border-[#2A2A3E]'}`}>
+              <div key={agent.id} className={`bg-[#141414] border rounded-lg p-3 ${liveAgentIds.has(agent.id) ? 'border-green-500/40' : 'border-[#252525]'}`}>
                 <div className="flex items-center gap-2 mb-1">
                   <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: statusColor, boxShadow: `0 0 6px ${statusColor}88` }} />
                   <span className="text-white text-sm font-semibold">{agent.name}</span>
@@ -794,7 +794,7 @@ export default function AgentsPage() {
         </div>
 
         {/* Event Log */}
-        <div className="col-span-4 bg-[#1A1A2E] border border-[#2A2A3E] rounded-lg p-3 max-h-[200px] overflow-y-auto">
+        <div className="col-span-4 bg-[#141414] border border-[#252525] rounded-lg p-3 max-h-[200px] overflow-y-auto">
           <h3 className="text-gray-400 text-xs font-semibold mb-2 uppercase tracking-wider">Activity Log</h3>
           {eventLog.length === 0 ? (
             <p className="text-gray-600 text-xs">No activity yet...</p>
@@ -816,7 +816,7 @@ export default function AgentsPage() {
           onClick={() => setSelectedAgent(null)}
         >
           <div
-            className="bg-[#1A1A2E] border border-[#2A2A3E] rounded-lg p-6 max-w-md w-full mx-4 shadow-2xl"
+            className="bg-[#141414] border border-[#252525] rounded-lg p-6 max-w-md w-full mx-4 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -845,7 +845,7 @@ export default function AgentsPage() {
             </div>
 
             {/* Current Status */}
-            <div className="bg-[#2A2A3E] rounded-lg p-3 mb-4">
+            <div className="bg-[#252525] rounded-lg p-3 mb-4">
               <div className="text-gray-400 text-xs uppercase tracking-wider mb-2">Current Activity</div>
               <div className="text-white font-semibold mb-1">{selectedAgent.task}</div>
               <div className="text-gray-500 text-xs">@ {STATIONS[selectedAgent.station]?.label || selectedAgent.station}</div>
@@ -853,19 +853,19 @@ export default function AgentsPage() {
 
             {/* Stats */}
             <div className="grid grid-cols-2 gap-3 mb-4">
-              <div className="bg-[#2A2A3E] rounded-lg p-3">
+              <div className="bg-[#252525] rounded-lg p-3">
                 <div className="text-gray-400 text-xs uppercase tracking-wider mb-1">Status</div>
                 <div className="text-white font-semibold capitalize">{selectedAgent.status}</div>
               </div>
-              <div className="bg-[#2A2A3E] rounded-lg p-3">
+              <div className="bg-[#252525] rounded-lg p-3">
                 <div className="text-gray-400 text-xs uppercase tracking-wider mb-1">Task Type</div>
                 <div className="text-white font-semibold capitalize">{selectedAgent.taskType}</div>
               </div>
-              <div className="bg-[#2A2A3E] rounded-lg p-3">
+              <div className="bg-[#252525] rounded-lg p-3">
                 <div className="text-gray-400 text-xs uppercase tracking-wider mb-1">Tokens Used</div>
                 <div className="text-white font-semibold">{selectedAgent.totalTokens ?? 0}</div>
               </div>
-              <div className="bg-[#2A2A3E] rounded-lg p-3">
+              <div className="bg-[#252525] rounded-lg p-3">
                 <div className="text-gray-400 text-xs uppercase tracking-wider mb-1">Uptime</div>
                 <div className="text-white font-semibold">
                   {selectedAgent.joinedAt
@@ -881,7 +881,7 @@ export default function AgentsPage() {
                 <div className="text-gray-400 text-xs uppercase tracking-wider mb-2">Recent Tasks</div>
                 <div className="space-y-2 max-h-[150px] overflow-y-auto">
                   {selectedAgent.taskHistory.slice(-5).reverse().map((entry, i) => (
-                    <div key={i} className="bg-[#2A2A3E] rounded p-2">
+                    <div key={i} className="bg-[#252525] rounded p-2">
                       <div className="text-gray-300 text-xs font-medium">{entry.task}</div>
                       <div className="text-gray-500 text-[10px]">{entry.taskType}</div>
                     </div>
@@ -893,7 +893,7 @@ export default function AgentsPage() {
             {/* Close Button */}
             <button
               onClick={() => setSelectedAgent(null)}
-              className="w-full bg-[#2A2A3E] hover:bg-[#3a3a4e] text-gray-300 font-medium py-2 rounded-lg transition-colors"
+              className="w-full bg-[#252525] hover:bg-[#333333] text-gray-300 font-medium py-2 rounded-lg transition-colors"
             >
               Close
             </button>

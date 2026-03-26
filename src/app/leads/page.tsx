@@ -9,6 +9,7 @@ interface Lead {
   company_name: string;
   first_name?: string;
   contact_name?: string;
+  owner_name?: string;
   phone: string;
   city: string;
   state: string;
@@ -31,6 +32,9 @@ interface Lead {
   review_highlights?: string;
   social_media?: string;
   research_completed?: boolean;
+  // Priority scoring
+  priority_score?: number;
+  gap_severity?: 'critical' | 'high' | 'medium' | 'low' | 'none';
 }
 
 const statusColors: Record<string, string> = {
@@ -61,6 +65,11 @@ export default function LeadsPage() {
   const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
   const [editingMessageText, setEditingMessageText] = useState('');
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+  const [selectedLeads, setSelectedLeads] = useState<Set<number>>(new Set());
+  const [bulkSending, setBulkSending] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{ sent: number; total: number } | null>(null);
+  const [priorityFilter, setPriorityFilter] = useState<'all' | 'critical' | 'high' | 'medium' | 'low'>('all');
+  const [sortByPriority, setSortByPriority] = useState(false);
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type });
@@ -93,9 +102,10 @@ export default function LeadsPage() {
     }
   };
 
-  const fetchLeads = async () => {
+  const fetchLeads = async (priority?: boolean) => {
+    const usePriority = priority ?? sortByPriority;
     try {
-      const res = await fetch('/api/leads');
+      const res = await fetch(`/api/leads${usePriority ? '?sort=priority' : ''}`);
       const data = await res.json();
       setLeads(data);
     } catch (error) {
@@ -117,6 +127,11 @@ export default function LeadsPage() {
     // (no phone = data issue, couldn't have been contacted)
     if (CONTACT_STATUSES.has(filter)) {
       base = base.filter(l => l.phone && l.phone.trim() !== '');
+    }
+
+    // Apply priority filter
+    if (priorityFilter !== 'all') {
+      base = base.filter(l => l.gap_severity === priorityFilter);
     }
 
     return base;
@@ -255,6 +270,62 @@ export default function LeadsPage() {
     }
   };
 
+  const pendingLeads = outreachLeads.filter(l => l.status === 'pending_approval');
+  const allPendingSelected = pendingLeads.length > 0 && pendingLeads.every(l => selectedLeads.has(l.id));
+
+  const toggleLeadSelect = (id: number) => {
+    setSelectedLeads(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllLeads = () => {
+    if (allPendingSelected) {
+      setSelectedLeads(new Set());
+    } else {
+      setSelectedLeads(new Set(pendingLeads.map(l => l.id)));
+    }
+  };
+
+  const handleBulkSendIMessage = async () => {
+    const ids = [...selectedLeads];
+    setBulkSending(true);
+    setBulkProgress({ sent: 0, total: ids.length });
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i];
+      const lead = leads.find(l => l.id === id);
+      if (!lead) continue;
+      // Optimistic update
+      setLeads(prev => prev.map(l => l.id === id ? { ...l, status: 'sent' } : l));
+      try {
+        const res = await fetch('/api/leads/send-imessage', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lead_id: id }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          // Revert on failure
+          setLeads(prev => prev.map(l => l.id === id ? { ...l, status: 'pending_approval' } : l));
+          showToast(`Failed to send to ${lead.company_name}: ${data.error || 'Unknown error'}`, 'error');
+        } else {
+          setSelectedLeads(prev => { const next = new Set(prev); next.delete(id); return next; });
+        }
+      } catch {
+        setLeads(prev => prev.map(l => l.id === id ? { ...l, status: 'pending_approval' } : l));
+        showToast(`Network error sending to ${lead.company_name}`, 'error');
+      }
+      setBulkProgress({ sent: i + 1, total: ids.length });
+      if (i < ids.length - 1) await new Promise(r => setTimeout(r, 2000));
+    }
+    setBulkSending(false);
+    setBulkProgress(null);
+    showToast(`Batch complete — sent ${ids.length} messages`, 'success');
+    fetchLeads();
+  };
+
   const handleResearch = async () => {
     setResearching(true);
     try {
@@ -325,7 +396,7 @@ export default function LeadsPage() {
   if (loading) return <div className="p-8 text-center text-gray-400">Loading leads...</div>;
 
   return (
-    <div className="min-h-screen bg-[#0A0A0F] p-6">
+    <div className="p-6">
       <div className="max-w-full mx-auto">
 
         {/* OUTREACH QUEUE SECTION */}
@@ -338,15 +409,59 @@ export default function LeadsPage() {
                   {outreachLeads.length}
                 </span>
               </h2>
+              {pendingLeads.length > 0 && (
+                <div className="flex items-center gap-3">
+                  {bulkProgress && (
+                    <span className="text-sm text-gray-400">
+                      Sending {bulkProgress.sent} of {bulkProgress.total}…
+                    </span>
+                  )}
+                  {selectedLeads.size > 0 && !bulkSending && (
+                    <button
+                      onClick={handleBulkSendIMessage}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-500"
+                    >
+                      Send Selected ({selectedLeads.size})
+                    </button>
+                  )}
+                  <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={allPendingSelected}
+                      onChange={toggleSelectAllLeads}
+                      disabled={bulkSending}
+                      className="w-4 h-4 accent-green-500"
+                    />
+                    Select All
+                  </label>
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {outreachLeads.map((lead) => (
                 <div
                   key={lead.id}
-                  className={`bg-[#1A1A2E] rounded-xl border p-4 ${lead.status === 'failed' ? 'border-red-500/50' : 'border-orange-500/30'}`}
+                  className={`bg-[#141414] rounded-xl border p-4 transition-colors ${
+                    lead.status === 'failed'
+                      ? 'border-red-500/50'
+                      : selectedLeads.has(lead.id)
+                      ? 'border-green-500/50'
+                      : 'border-orange-500/30'
+                  }`}
                 >
                   <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-semibold text-white text-sm">{lead.company_name}</h3>
+                    <div className="flex items-center gap-2">
+                      {lead.status === 'pending_approval' && (
+                        <input
+                          type="checkbox"
+                          checked={selectedLeads.has(lead.id)}
+                          onChange={() => toggleLeadSelect(lead.id)}
+                          disabled={bulkSending}
+                          className="w-4 h-4 accent-green-500 cursor-pointer flex-shrink-0"
+                        />
+                      )}
+                      <h3 className="font-semibold text-white text-sm">{lead.company_name}</h3>
+                    </div>
                     <span className={`px-2 py-0.5 rounded-full text-xs ${lead.status === 'failed' ? 'bg-red-900 text-red-300' : 'bg-orange-900 text-orange-300'}`}>
                       {lead.status === 'failed' ? 'Failed' : 'Pending'}
                     </span>
@@ -354,7 +469,7 @@ export default function LeadsPage() {
                   <div className="text-xs text-gray-400 mb-2">
                     📞 {lead.phone}
                   </div>
-                  <div className="relative bg-[#0A0A0F] rounded-lg p-3 mb-3 border border-[#2A2A3E]">
+                  <div className="relative bg-[#0D0D0D] rounded-lg p-3 mb-3 border border-[#252525]">
                     {editingMessageId === lead.id ? (
                       <div>
                         <textarea
@@ -403,7 +518,7 @@ export default function LeadsPage() {
                     {lead.status === 'failed' ? (
                       <button
                         onClick={() => handleSendIMessage(lead)}
-                        disabled={sendingLeadId === lead.id}
+                        disabled={sendingLeadId === lead.id || bulkSending}
                         className="flex-1 py-2 px-3 bg-orange-600 text-white text-xs rounded-lg hover:bg-orange-500 font-medium disabled:opacity-50"
                       >
                         {sendingLeadId === lead.id ? 'Retrying...' : '🔄 Retry'}
@@ -411,7 +526,7 @@ export default function LeadsPage() {
                     ) : (
                       <button
                         onClick={() => handleSendIMessage(lead)}
-                        disabled={sendingLeadId === lead.id}
+                        disabled={sendingLeadId === lead.id || bulkSending}
                         className="flex-1 py-2 px-3 bg-green-600 text-white text-xs rounded-lg hover:bg-green-500 font-medium disabled:opacity-50"
                       >
                         {sendingLeadId === lead.id ? 'Approving...' : '✅ Approve'}
@@ -419,7 +534,7 @@ export default function LeadsPage() {
                     )}
                     <button
                       onClick={() => handleReject(lead)}
-                      disabled={sendingLeadId === lead.id}
+                      disabled={sendingLeadId === lead.id || bulkSending}
                       className="py-2 px-3 bg-gray-700 text-gray-300 text-xs rounded-lg hover:bg-gray-600 disabled:opacity-50"
                     >
                       ❌ Reject
@@ -470,7 +585,7 @@ export default function LeadsPage() {
         </div>
 
         {/* Status Filter Tabs */}
-        <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+        <div className="flex gap-2 mb-3 overflow-x-auto pb-2">
           {Object.entries(statusCounts).map(([status, count]) => (
             <button
               key={status}
@@ -478,12 +593,52 @@ export default function LeadsPage() {
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition ${
                 filter === status
                   ? 'bg-[#DC143C] text-white'
-                  : 'bg-[#1A1A2E] text-gray-400 hover:bg-[#2A2A3E]'
+                  : 'bg-[#141414] text-gray-400 hover:bg-[#2A2A3E]'
               }`}
             >
               {status === 'pending_approval' ? 'pending' : status.charAt(0).toUpperCase() + status.slice(1)} ({count})
             </button>
           ))}
+        </div>
+
+        {/* Priority Filter + Sort Row */}
+        <div className="flex items-center gap-3 mb-4">
+          <span className="text-xs text-gray-500 font-medium uppercase tracking-wider">Priority:</span>
+          {(['all', 'critical', 'high', 'medium', 'low'] as const).map(p => {
+            const colors: Record<string, string> = {
+              all:      'bg-[#141414] text-gray-400 hover:bg-[#252525]',
+              critical: priorityFilter === 'critical' ? 'bg-red-700 text-white' : 'bg-red-900/30 text-red-400 hover:bg-red-900/50',
+              high:     priorityFilter === 'high'     ? 'bg-amber-700 text-white' : 'bg-amber-900/30 text-amber-400 hover:bg-amber-900/50',
+              medium:   priorityFilter === 'medium'   ? 'bg-yellow-700 text-white' : 'bg-yellow-900/30 text-yellow-400 hover:bg-yellow-900/50',
+              low:      priorityFilter === 'low'      ? 'bg-gray-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700',
+            };
+            const activeAll = p === 'all' && priorityFilter === 'all' ? 'bg-[#DC143C] text-white' : '';
+            return (
+              <button
+                key={p}
+                onClick={() => setPriorityFilter(p)}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition ${activeAll || colors[p]}`}
+              >
+                {p === 'all' ? 'All' : p.charAt(0).toUpperCase() + p.slice(1)}
+              </button>
+            );
+          })}
+          <div className="ml-auto">
+            <button
+              onClick={() => {
+                const next = !sortByPriority;
+                setSortByPriority(next);
+                fetchLeads(next);
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 ${
+                sortByPriority
+                  ? 'bg-[#DC143C] text-white'
+                  : 'bg-[#141414] text-gray-400 border border-[#252525] hover:bg-[#252525]'
+              }`}
+            >
+              ↓ Sort by Priority
+            </button>
+          </div>
         </div>
 
         {/* Data Issues Banner */}
@@ -504,26 +659,27 @@ export default function LeadsPage() {
         )}
 
         {/* Spreadsheet Layout */}
-        <div className="bg-[#1A1A2E] rounded-xl border border-[#2A2A3E] overflow-hidden">
+        <div className="bg-[#141414] rounded-xl border border-[#252525] overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-[#0A0A0F] text-gray-400 text-left">
+              <thead className="bg-[#0D0D0D] text-gray-400 text-left">
                 <tr>
-                  <th className="px-4 py-3 font-medium border-b border-[#2A2A3E]">Owner</th>
-                  <th className="px-4 py-3 font-medium border-b border-[#2A2A3E]">Company</th>
-                  <th className="px-4 py-3 font-medium border-b border-[#2A2A3E]">Phone</th>
-                  <th className="px-4 py-3 font-medium border-b border-[#2A2A3E]">City</th>
-                  <th className="px-4 py-3 font-medium border-b border-[#2A2A3E]">Industry</th>
-                  <th className="px-4 py-3 font-medium border-b border-[#2A2A3E]">Website</th>
-                  <th className="px-4 py-3 font-medium border-b border-[#2A2A3E]">Rating</th>
-                  <th className="px-4 py-3 font-medium border-b border-[#2A2A3E]">Source</th>
-                  <th className="px-4 py-3 font-medium border-b border-[#2A2A3E]">Status</th>
-                  <th className="px-4 py-3 font-medium border-b border-[#2A2A3E]">Actions</th>
+                  <th className="px-4 py-3 font-medium border-b border-[#252525]">Owner</th>
+                  <th className="px-4 py-3 font-medium border-b border-[#252525]">Company</th>
+                  <th className="px-4 py-3 font-medium border-b border-[#252525]">Phone</th>
+                  <th className="px-4 py-3 font-medium border-b border-[#252525]">City</th>
+                  <th className="px-4 py-3 font-medium border-b border-[#252525]">Industry</th>
+                  <th className="px-4 py-3 font-medium border-b border-[#252525]">Website</th>
+                  <th className="px-4 py-3 font-medium border-b border-[#252525]">Rating</th>
+                  <th className="px-4 py-3 font-medium border-b border-[#252525]">Priority</th>
+                  <th className="px-4 py-3 font-medium border-b border-[#252525]">Source</th>
+                  <th className="px-4 py-3 font-medium border-b border-[#252525]">Status</th>
+                  <th className="px-4 py-3 font-medium border-b border-[#252525]">Actions</th>
                 </tr>
               </thead>
               <tbody className="text-gray-300">
                 {filteredLeads.map((lead) => (
-                  <tr key={lead.id} className="border-b border-[#2A2A3E] hover:bg-[#2A2A3E]/50">
+                  <tr key={lead.id} className="border-b border-[#252525] hover:bg-[#252525]/50">
                     <td className="px-4 py-3 text-gray-400">{lead.first_name || '-'}</td>
                     <td className="px-4 py-3 font-medium text-white">
                       {lead.company_name}
@@ -553,6 +709,26 @@ export default function LeadsPage() {
                       ) : (
                         <span className="text-gray-500">-</span>
                       )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {(() => {
+                        const sev = lead.gap_severity;
+                        const score = lead.priority_score;
+                        if (!sev || sev === 'none') {
+                          return <span className="px-2 py-0.5 rounded text-xs bg-[#141414] text-[#555] border border-[#252525]">—</span>;
+                        }
+                        const styles: Record<string, string> = {
+                          critical: 'bg-red-900/50 text-red-400 border border-red-700',
+                          high:     'bg-amber-900/50 text-amber-400 border border-amber-700',
+                          medium:   'bg-yellow-900/50 text-yellow-400 border border-yellow-700',
+                          low:      'bg-gray-800 text-gray-400 border border-gray-600',
+                        };
+                        return (
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${styles[sev]}`}>
+                            {sev.toUpperCase()} {score !== undefined ? score : ''}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-3 text-gray-500 text-xs">{lead.source}</td>
                     <td className="px-4 py-3">
@@ -621,7 +797,7 @@ export default function LeadsPage() {
       {/* Message Preview Modal */}
       {selectedLead && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-          <div className="bg-[#1A1A2E] rounded-2xl max-w-lg w-full p-6 border border-[#2A2A3E]">
+          <div className="bg-[#141414] rounded-2xl max-w-lg w-full p-6 border border-[#252525]">
             <h2 className="text-xl font-bold mb-4 text-white">{selectedLead.company_name}</h2>
 
             <div className="space-y-3 mb-4 text-sm">
@@ -632,13 +808,25 @@ export default function LeadsPage() {
                 <div><span className="text-gray-500">Industry:</span> <span className="text-white">{selectedLead.industry}</span></div>
                 <div><span className="text-gray-500">Rating:</span> <span className="text-yellow-400">{selectedLead.google_rating || '-'} ⭐</span></div>
                 <div><span className="text-gray-500">Source:</span> <span className="text-white">{selectedLead.source}</span></div>
+                {selectedLead.gap_severity && selectedLead.gap_severity !== 'none' && (
+                  <div className="col-span-2">
+                    <span className="text-gray-500">Gap Priority:</span>{' '}
+                    <span className={`font-semibold ${
+                      selectedLead.gap_severity === 'critical' ? 'text-red-400' :
+                      selectedLead.gap_severity === 'high'     ? 'text-amber-400' :
+                      selectedLead.gap_severity === 'medium'   ? 'text-yellow-400' : 'text-gray-400'
+                    }`}>
+                      {selectedLead.gap_severity.toUpperCase()} ({selectedLead.priority_score}/100)
+                    </span>
+                  </div>
+                )}
                 <div><span className="text-gray-500">Website:</span> <span className="text-white">{selectedLead.website_url || 'None'}</span></div>
               </div>
             </div>
 
             {/* Research Summary */}
             {selectedLead.research_completed && (
-              <div className="bg-[#0A0A0F] rounded-lg p-4 mb-4 border border-[#2A2A3E]">
+              <div className="bg-[#0D0D0D] rounded-lg p-4 mb-4 border border-[#252525]">
                 <p className="text-sm text-gray-500 mb-3 font-medium">🔍 Research Summary</p>
                 <div className="space-y-2 text-xs">
                   {selectedLead.website_status && (
@@ -668,7 +856,7 @@ export default function LeadsPage() {
                     </div>
                   )}
                   {selectedLead.personal_observation && (
-                    <div className="flex gap-2 mt-2 pt-2 border-t border-[#2A2A3E]">
+                    <div className="flex gap-2 mt-2 pt-2 border-t border-[#252525]">
                       <span className="text-gray-500 w-24 flex-shrink-0">Hook:</span>
                       <span className="italic" style={{ color: '#DC143C' }}>"{selectedLead.personal_observation}"</span>
                     </div>
@@ -677,7 +865,7 @@ export default function LeadsPage() {
               </div>
             )}
 
-            <div className="bg-[#0A0A0F] rounded-lg p-4 mb-4 border border-[#2A2A3E]">
+            <div className="bg-[#0D0D0D] rounded-lg p-4 mb-4 border border-[#252525]">
               <p className="text-sm text-gray-500 mb-2">Message Preview:</p>
               <p className="text-gray-200 whitespace-pre-wrap text-sm">
                 {selectedLead.message_drafted || generateMessage(selectedLead)}
@@ -686,7 +874,7 @@ export default function LeadsPage() {
 
             {/* Loom & Call Outcome — shown for leads that have been sent */}
             {['sent', 'hot', 'replied', 'cold', 'booked'].includes(selectedLead.status) && (
-              <div className="bg-[#0A0A0F] rounded-lg p-4 mb-4 border border-[#2A2A3E] space-y-3">
+              <div className="bg-[#0D0D0D] rounded-lg p-4 mb-4 border border-[#252525] space-y-3">
                 <p className="text-sm text-gray-500 font-medium">📋 Log Outreach Data</p>
 
                 {/* Site Ready for Review */}
@@ -717,7 +905,7 @@ export default function LeadsPage() {
                       value={loomInput}
                       onChange={e => setLoomInput(e.target.value)}
                       placeholder="https://loom.com/share/..."
-                      className="flex-1 bg-[#1A1A2E] border border-[#2A2A3E] rounded px-3 py-1.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-[#DC143C]"
+                      className="flex-1 bg-[#141414] border border-[#252525] rounded px-3 py-1.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-[#DC143C]"
                     />
                     <button
                       onClick={() => handleSaveField('loom_url', loomInput)}
@@ -756,7 +944,7 @@ export default function LeadsPage() {
                     <select
                       value={callOutcomeInput}
                       onChange={e => setCallOutcomeInput(e.target.value)}
-                      className="flex-1 bg-[#1A1A2E] border border-[#2A2A3E] rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#DC143C]"
+                      className="flex-1 bg-[#141414] border border-[#252525] rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#DC143C]"
                     >
                       <option value="">— select outcome —</option>
                       <option value="booked">✅ Booked</option>
@@ -781,7 +969,7 @@ export default function LeadsPage() {
             <div className="flex gap-3">
               <button
                 onClick={() => setSelectedLead(null)}
-                className="flex-1 py-2 px-4 border border-[#2A2A3E] text-gray-400 rounded-lg hover:bg-[#2A2A3E]"
+                className="flex-1 py-2 px-4 border border-[#252525] text-gray-400 rounded-lg hover:bg-[#2A2A3E]"
               >
                 Cancel
               </button>

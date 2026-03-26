@@ -3,20 +3,34 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import {
+  Rocket,
+  LayoutDashboard,
+  Phone,
+  TrendingUp,
+  Briefcase,
+  FileText,
+  Tag,
+  Users,
+  Shield,
+  BarChart2,
+  Calendar,
+  Search,
+} from 'lucide-react';
 
 const navItems = [
-  { href: '/feed', label: 'Feed', icon: '📡' },
-  { href: '/tasks', label: 'Tasks', icon: '✅' },
-  { href: '/leads', label: 'Leads', icon: '📱' },
-  { href: '/kpi', label: 'KPIs', icon: '📊' },
-  { href: '/jobs', label: 'Jobs', icon: '💼' },
-  { href: '/content', label: 'Content', icon: '📝' },
-  { href: '/vending', label: 'Vending', icon: '🏧' },
-  { href: '/agents', label: 'Council', icon: '🤖' },
-  { href: '/security', label: 'Security', icon: '🔒' },
-  { href: '/metrics', label: 'Metrics', icon: '📊' },
-  { href: '/calendar', label: 'Calendar', icon: '📅' },
-  { href: '/search', label: 'Search', icon: '🔍' },
+  { href: '/feed',     label: 'Feed',     Icon: Rocket },
+  { href: '/tasks',    label: 'Tasks',    Icon: LayoutDashboard },
+  { href: '/leads',    label: 'Leads',    Icon: Phone },
+  { href: '/kpi',      label: 'KPIs',     Icon: TrendingUp },
+  { href: '/jobs',     label: 'Jobs',     Icon: Briefcase },
+  { href: '/content',  label: 'Content',  Icon: FileText },
+  { href: '/vending',  label: 'Vending',  Icon: Tag },
+  { href: '/agents',   label: 'Council',  Icon: Users },
+  { href: '/security', label: 'Security', Icon: Shield },
+  { href: '/metrics',  label: 'Metrics',  Icon: BarChart2 },
+  { href: '/calendar', label: 'Calendar', Icon: Calendar },
+  { href: '/search',   label: 'Search',   Icon: Search },
 ];
 
 export function Navbar() {
@@ -38,44 +52,52 @@ export function Navbar() {
   }, []);
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-[#2A2A3E] bg-[#0A0A0F]/80 backdrop-blur-md">
-      <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Link href="/feed" className="flex items-center gap-2 text-xl font-bold hover:opacity-80 transition">
-            <span className="text-2xl">🦀</span>
-            <span className="hidden sm:inline">Mission Control</span>
-          </Link>
-        </div>
+    <nav className="fixed left-0 top-0 h-screen w-[72px] flex flex-col bg-[#0D0D0D] border-r border-[#252525] z-50">
+      {/* Logo */}
+      <Link
+        href="/feed"
+        className="h-14 flex items-center justify-center border-b border-[#252525] hover:bg-[#141414] transition"
+        title="Mission Control"
+      >
+        <span className="text-[#DC2626] font-black text-sm tracking-widest">MC</span>
+      </Link>
 
-        <div className="flex items-center gap-1 overflow-x-auto">
-          {navItems.map((item) => {
-            const isActive = pathname === item.href || 
-              (item.href !== '/' && pathname.startsWith(item.href));
-            return (
+      {/* Nav items */}
+      <div className="flex-1 flex flex-col gap-0.5 py-2 overflow-y-auto">
+        {navItems.map(({ href, label, Icon }) => {
+          const isActive =
+            pathname === href || (href !== '/' && pathname.startsWith(href));
+          return (
+            <div key={href} className="relative group px-2">
               <Link
-                key={item.href}
-                href={item.href}
-                className={`px-2 py-1.5 rounded-lg text-xs sm:text-sm transition whitespace-nowrap ${
+                href={href}
+                className={`flex items-center justify-center w-full h-11 rounded-lg transition-all ${
                   isActive
-                    ? 'bg-[#1A1A2E] text-[#DC143C]'
-                    : 'text-gray-400 hover:text-white hover:bg-[#1A1A2E]'
+                    ? 'bg-[#DC2626]/10 text-[#DC2626] border-l-2 border-[#DC2626] rounded-l-none'
+                    : 'text-[#555555] hover:text-white hover:bg-[#141414]'
                 }`}
               >
-                <span className="mr-1">{item.icon}</span>
-                <span className="hidden md:inline">{item.label}</span>
+                <Icon size={18} strokeWidth={isActive ? 2.5 : 1.8} />
               </Link>
-            );
-          })}
-        </div>
+              {/* Tooltip */}
+              <div className="pointer-events-none absolute left-[60px] top-1/2 -translate-y-1/2 z-50 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="bg-[#1A1A1A] border border-[#252525] text-white text-[11px] font-medium tracking-wider px-2.5 py-1.5 rounded whitespace-nowrap shadow-lg">
+                  {label.toUpperCase()}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
 
-        <div className="flex items-center gap-2">
-          <div
-            className={`w-2 h-2 rounded-full ${
-              gatewayStatus === 'online' ? 'bg-green-500 animate-pulse' : 'bg-red-500'
-            }`}
-            title={`Gateway: ${gatewayStatus}`}
-          />
-        </div>
+      {/* Gateway status */}
+      <div className="h-14 flex items-center justify-center border-t border-[#252525]">
+        <div
+          className={`w-2 h-2 rounded-full ${
+            gatewayStatus === 'online' ? 'bg-green-500 animate-pulse' : 'bg-red-500'
+          }`}
+          title={`Gateway: ${gatewayStatus}`}
+        />
       </div>
     </nav>
   );

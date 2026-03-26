@@ -42,11 +42,11 @@ export async function GET() {
         SELECT
           'content' AS type,
           title || ' [' || status || ']' AS description,
-          updated_at AS timestamp,
+          created_at AS timestamp,
           status AS meta
         FROM content_ideas
-        WHERE updated_at > NOW() - INTERVAL '7 days'
-        ORDER BY updated_at DESC
+        WHERE created_at > NOW() - INTERVAL '7 days'
+        ORDER BY created_at DESC
         LIMIT 10
       ) content_activity
 

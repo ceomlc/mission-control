@@ -110,7 +110,7 @@ export default function JobsPage() {
   );
 
   return (
-    <div className="min-h-screen bg-[#0A0A0F] p-6">
+    <div className="p-6">
       <div className="max-w-3xl mx-auto">
 
         {/* Header */}
@@ -120,7 +120,7 @@ export default function JobsPage() {
         </div>
 
         {/* Info banner */}
-        <div className="mb-6 bg-[#1A1A2E] border border-[#2A2A3E] rounded-xl px-4 py-3 text-sm text-gray-400">
+        <div className="mb-6 bg-[#141414] border border-[#252525] rounded-xl px-4 py-3 text-sm text-gray-400">
           Athena sources new jobs every 4 hours. Review and apply at your own pace.
         </div>
 
@@ -134,14 +134,14 @@ export default function JobsPage() {
                 onClick={() => setActiveTab(tab.key)}
                 className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
                   activeTab === tab.key
-                    ? 'bg-[#22d3ee] text-black'
-                    : 'bg-[#1A1A2E] text-gray-400 border border-[#2A2A3E] hover:border-[#22d3ee]/40'
+                    ? 'bg-[#DC2626] text-white'
+                    : 'bg-[#141414] text-gray-400 border border-[#252525] hover:border-[#DC2626]/40'
                 }`}
               >
                 {tab.label}
                 {count > 0 && (
                   <span className={`ml-2 px-1.5 py-0.5 rounded-full text-xs ${
-                    activeTab === tab.key ? 'bg-black/20 text-black' : 'bg-[#2A2A3E] text-gray-400'
+                    activeTab === tab.key ? 'bg-white/20 text-white' : 'bg-[#252525] text-gray-400'
                   }`}>
                     {count}
                   </span>
@@ -156,10 +156,10 @@ export default function JobsPage() {
           {tabJobs.map(job => (
             <div
               key={job.id}
-              className={`bg-[#1A1A2E] rounded-xl border p-5 transition-all ${
+              className={`bg-[#141414] rounded-xl border p-5 transition-all ${
                 activeTab === 'skipped'
-                  ? 'border-[#2A2A3E] opacity-60'
-                  : 'border-[#2A2A3E] hover:border-[#22d3ee]/30'
+                  ? 'border-[#252525] opacity-60'
+                  : 'border-[#252525] hover:border-[#DC2626]/30'
               }`}
             >
               {/* Card header */}
@@ -201,7 +201,7 @@ export default function JobsPage() {
                     <button
                       onClick={() => handleApply(job)}
                       disabled={updating === job.id}
-                      className="px-3 py-1.5 text-sm bg-[#22d3ee] text-black rounded-lg hover:bg-[#06b6d4] font-bold disabled:opacity-40"
+                      className="px-3 py-1.5 text-sm bg-[#DC2626] text-white rounded-lg hover:bg-[#b91c1c] font-bold disabled:opacity-40"
                     >
                       {updating === job.id ? 'Opening...' : 'Apply →'}
                     </button>

@@ -27,7 +27,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { lead_id, call_sid, touch_number, outcome, notes, duration_seconds } = body;
+    const { lead_id, call_sid, touch_number, outcome, notes, duration_seconds, tags } = body;
 
     if (!lead_id) {
       return NextResponse.json({ error: 'lead_id required' }, { status: 400 });
@@ -35,10 +35,10 @@ export async function POST(request: Request) {
 
     const result = await pool.query(
       `INSERT INTO vending_call_logs
-         (lead_id, call_sid, touch_number, outcome, notes, duration_seconds)
-       VALUES ($1, $2, $3, $4, $5, $6)
+         (lead_id, call_sid, touch_number, outcome, notes, duration_seconds, tags)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
-      [lead_id, call_sid || null, touch_number || 1, outcome || null, notes || null, duration_seconds || 0]
+      [lead_id, call_sid || null, touch_number || 1, outcome || null, notes || null, duration_seconds || 0, tags || []]
     );
 
     // Mirror outcome to vending_leads

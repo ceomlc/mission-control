@@ -9,7 +9,16 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { outcome, notes } = body;
+    const { outcome, notes, score } = body;
+
+    // Score-only update (no outcome change)
+    if (score !== undefined && !outcome) {
+      await pool.query(
+        `UPDATE vending_leads SET score = $1, updated_at = NOW() WHERE id = $2`,
+        [score, id]
+      );
+      return NextResponse.json({ success: true, action: 'score_updated' });
+    }
 
     // outcome: 'interested' | 'voicemail' | 'not_interested' | 'callback'
     if (!outcome) {

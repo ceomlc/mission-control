@@ -31,6 +31,7 @@ interface CallLog {
   recording_url?: string;
   outcome?: string;
   notes?: string;
+  tags?: string[];
   called_at: string;
 }
 
@@ -118,8 +119,14 @@ export default function PhonePage() {
   const [callDuration, setCallDuration] = useState(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const [callingLeadId, setCallingLeadId] = useState<string | null>(null);
+  const [callTags, setCallTags] = useState<string[]>([]);
+
+  const QUICK_TAGS = ['Gatekeeper', 'Decision Maker', 'Left VM', 'Called Back', 'Interested', 'Price Objection', 'Has Vendor', 'Follow Up'];
 
   useEffect(() => { fetchLeads(); }, []);
+
+  // Auto-initialize dialer on mount
+  useEffect(() => { initDevice(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Cleanup timer on unmount
   useEffect(() => {
@@ -214,6 +221,7 @@ export default function PhonePage() {
       call.on('disconnect', () => {
         if (timerRef.current) clearInterval(timerRef.current);
         setCallState('ended');
+        setCallingLeadId(null);
         activeCallRef.current = null;
       });
 
@@ -242,6 +250,16 @@ export default function PhonePage() {
     activeCallRef.current?.disconnect();
   }
 
+  async function updateScore(lead: PhoneLead, score: number) {
+    setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, score } : l));
+    if (activeLead?.id === lead.id) setActiveLead(prev => prev ? { ...prev, score } : prev);
+    await fetch(`/api/vending/phone-leads/${lead.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ score }),
+    });
+  }
+
   async function logOutcome(outcome: 'interested' | 'voicemail' | 'not_interested' | 'callback' | 'no_answer') {
     if (!activeLead) return;
 
@@ -258,6 +276,7 @@ export default function PhonePage() {
         outcome,
         notes:            callNote,
         duration_seconds: callDuration,
+        tags:             callTags,
       }),
     });
 
@@ -282,6 +301,7 @@ export default function PhonePage() {
     setCallNote('');
     setCallDuration(0);
     setCallSid(null);
+    setCallTags([]);
   }
 
   function selectLead(lead: PhoneLead) {
@@ -291,10 +311,6 @@ export default function PhonePage() {
     setCallState('idle');
     fetchCallLogs(lead.id);
 
-    // Initialize device when user first selects a lead
-    if (deviceState === 'offline') {
-      initDevice();
-    }
   }
 
   function getWalkInScript(lead: PhoneLead): string {
@@ -395,6 +411,9 @@ export default function PhonePage() {
                         <span className="text-xs text-gray-500">
                           Touch {lead.call_attempts}
                         </span>
+                      )}
+                      {lead.score !== undefined && lead.score !== null && (
+                        <span className="text-xs text-yellow-400 font-mono">⭐ {lead.score}</span>
                       )}
                     </div>
                     <p className="text-gray-400 text-sm mt-0.5">{lead.vertical} · {lead.city}, {lead.state}</p>
@@ -498,6 +517,43 @@ export default function PhonePage() {
                           </div>
                         )}
 
+                        {/* Likelihood score */}
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs text-gray-500 uppercase tracking-wide whitespace-nowrap">Likelihood (0–10)</span>
+                          <input
+                            type="range" min={0} max={10} step={0.5}
+                            value={lead.score ?? 5}
+                            onChange={e => updateScore(lead, parseFloat(e.target.value))}
+                            className="flex-1 accent-[#22d3ee]"
+                          />
+                          <span className="text-xs text-yellow-400 font-mono w-6 text-right">{lead.score ?? '—'}</span>
+                        </div>
+
+                        {/* Tag picker */}
+                        <div>
+                          <p className="text-xs text-gray-500 mb-2 uppercase tracking-wide">Tags</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {QUICK_TAGS.map(tag => {
+                              const selected = callTags.includes(tag);
+                              return (
+                                <button
+                                  key={tag}
+                                  onClick={() => setCallTags(prev =>
+                                    selected ? prev.filter(t => t !== tag) : [...prev, tag]
+                                  )}
+                                  className={`px-2 py-1 rounded-full text-xs border transition-colors ${
+                                    selected
+                                      ? 'bg-[#22d3ee]/20 border-[#22d3ee] text-[#22d3ee]'
+                                      : 'bg-transparent border-[#2A2A3E] text-gray-500 hover:border-gray-500'
+                                  }`}
+                                >
+                                  {tag}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
                         {/* Call note */}
                         <textarea
                           value={callNote}
@@ -546,40 +602,45 @@ export default function PhonePage() {
                             return (
                               <div
                                 key={log.id}
-                                className="flex items-center justify-between bg-[#0D0D14] rounded-lg px-3 py-2 border border-[#2A2A3E]"
+                                className="bg-[#0D0D14] rounded-lg px-3 py-2.5 border border-[#2A2A3E] space-y-1.5"
                               >
-                                <div className="flex items-center gap-3">
-                                  <span className="text-xs text-gray-500 w-14">
-                                    Touch {log.touch_number}
-                                  </span>
-                                  <span className={`text-xs ${color}`}>{label}</span>
-                                  {log.duration_seconds > 0 && (
-                                    <span className="text-xs text-gray-500">
-                                      {formatDuration(log.duration_seconds)}
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    <span className="text-xs text-gray-500 w-14">Touch {log.touch_number}</span>
+                                    <span className={`text-xs font-medium ${color}`}>{label}</span>
+                                    {log.duration_seconds > 0 && (
+                                      <span className="text-xs text-gray-500">{formatDuration(log.duration_seconds)}</span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs text-gray-600">
+                                      {new Date(log.called_at).toLocaleDateString()}
                                     </span>
-                                  )}
-                                  {log.notes && (
-                                    <span className="text-xs text-gray-500 italic truncate max-w-[120px]">
-                                      {log.notes}
-                                    </span>
-                                  )}
+                                    {log.recording_url && (
+                                      <a
+                                        href={log.recording_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-xs text-[#22d3ee] hover:underline"
+                                        onClick={e => e.stopPropagation()}
+                                      >
+                                        🎙️ Recording
+                                      </a>
+                                    )}
+                                  </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xs text-gray-600">
-                                    {new Date(log.called_at).toLocaleDateString()}
-                                  </span>
-                                  {log.recording_url && (
-                                    <a
-                                      href={log.recording_url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-xs text-[#22d3ee] hover:underline"
-                                      onClick={e => e.stopPropagation()}
-                                    >
-                                      🎙️ Recording
-                                    </a>
-                                  )}
-                                </div>
+                                {log.tags && log.tags.length > 0 && (
+                                  <div className="flex flex-wrap gap-1">
+                                    {log.tags.map(tag => (
+                                      <span key={tag} className="px-1.5 py-0.5 rounded-full text-[10px] bg-[#22d3ee]/10 border border-[#22d3ee]/30 text-[#22d3ee]">
+                                        {tag}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                                {log.notes && (
+                                  <p className="text-xs text-gray-400 italic">{log.notes}</p>
+                                )}
                               </div>
                             );
                           })}

@@ -160,7 +160,7 @@ export default function KPIPage() {
   }, []);
 
   if (loading) {
-    return <div className="p-8 text-center" style={{ color: '#E8E0D0' }}>Loading KPIs...</div>;
+    return <div className="p-8 text-center" style={{ color: '#e2e8f0' }}>Loading KPIs...</div>;
   }
 
   const summary = kpiData?.summary ?? {
@@ -197,8 +197,8 @@ export default function KPIPage() {
       {/* Activity counters — raw pipeline numbers                           */}
       {/* ------------------------------------------------------------------ */}
       <section>
-        <h2 className="text-lg font-semibold mb-1" style={{ color: '#E8E0D0' }}>In-Sequence</h2>
-        <p className="text-xs mb-3" style={{ color: '#E8E0D0', opacity: 0.5 }}>Leads that have been sent — these add up to your active pipeline</p>
+        <h2 className="text-lg font-semibold mb-1" style={{ color: '#e2e8f0' }}>In-Sequence</h2>
+        <p className="text-xs mb-3" style={{ color: '#e2e8f0', opacity: 0.5 }}>Leads that have been sent — these add up to your active pipeline</p>
         <div className="grid grid-cols-3 gap-4 mb-2">
           {[
             { label: 'iMessage Confirmed', value: summary.messages_sent, icon: '✅', color: '#22c55e', sub: 'Delivery confirmed by relay' },
@@ -208,26 +208,26 @@ export default function KPIPage() {
             <div
               key={label}
               className="rounded-xl p-4 flex flex-col gap-1"
-              style={{ background: '#1A1A2E', border: `1px solid ${color}40` }}
+              style={{ background: '#141414', border: `1px solid ${color}40` }}
             >
               <span className="text-2xl">{icon}</span>
               <span className="text-3xl font-bold" style={{ color }}>{value}</span>
-              <span className="text-xs font-medium" style={{ color: '#E8E0D0' }}>{label}</span>
-              <span className="text-xs" style={{ color: '#E8E0D0', opacity: 0.5 }}>{sub}</span>
+              <span className="text-xs font-medium" style={{ color: '#e2e8f0' }}>{label}</span>
+              <span className="text-xs" style={{ color: '#e2e8f0', opacity: 0.5 }}>{sub}</span>
             </div>
           ))}
         </div>
-        <div className="text-xs mb-8 px-1" style={{ color: '#E8E0D0', opacity: 0.4 }}>
+        <div className="text-xs mb-8 px-1" style={{ color: '#e2e8f0', opacity: 0.4 }}>
           Total in-sequence: {summary.messages_sent + summary.relay_pending + summary.total_replied}
         </div>
 
         <div className="rounded-xl p-4 flex items-center gap-4 mb-8"
-          style={{ background: '#1A1A2E', border: '1px solid #f59e0b40' }}>
+          style={{ background: '#141414', border: '1px solid #f59e0b40' }}>
           <span className="text-3xl">⏳</span>
           <div>
             <div className="text-3xl font-bold" style={{ color: '#f59e0b' }}>{summary.queue_depth}</div>
-            <div className="text-sm font-medium" style={{ color: '#E8E0D0' }}>Approval Queue</div>
-            <div className="text-xs" style={{ color: '#E8E0D0', opacity: 0.5 }}>Fresh leads staged by Thoth — not yet sent, separate from the pipeline above</div>
+            <div className="text-sm font-medium" style={{ color: '#e2e8f0' }}>Approval Queue</div>
+            <div className="text-xs" style={{ color: '#e2e8f0', opacity: 0.5 }}>Fresh leads staged by Thoth — not yet sent, separate from the pipeline above</div>
           </div>
         </div>
       </section>
@@ -236,7 +236,7 @@ export default function KPIPage() {
       {/* STEP 4 — Summary bar: 7 KPI cards                                  */}
       {/* ------------------------------------------------------------------ */}
       <section>
-        <h2 className="text-lg font-semibold mb-3" style={{ color: '#E8E0D0' }}>Performance Summary</h2>
+        <h2 className="text-lg font-semibold mb-3" style={{ color: '#e2e8f0' }}>Performance Summary</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {METRICS.map((cfg) => {
             const value = summary[cfg.key];
@@ -245,17 +245,17 @@ export default function KPIPage() {
               <div
                 key={cfg.key}
                 className="rounded-xl p-4 flex flex-col gap-1"
-                style={{ background: '#1A1A2E', border: '1px solid #E8E0D0' }}
+                style={{ background: '#141414', border: '1px solid #252525' }}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium" style={{ color: '#E8E0D0' }}>{cfg.label}</span>
+                  <span className="text-xs font-medium" style={{ color: '#e2e8f0' }}>{cfg.label}</span>
                   <span
                     className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                     style={{ background: dotColor }}
                   />
                 </div>
                 <div className="text-3xl font-bold text-white">{fmt(value)}</div>
-                <div className="text-xs" style={{ color: '#E8E0D0', opacity: 0.7 }}>{cfg.target}</div>
+                <div className="text-xs" style={{ color: '#e2e8f0', opacity: 0.7 }}>{cfg.target}</div>
               </div>
             );
           })}
@@ -266,23 +266,23 @@ export default function KPIPage() {
       {/* STEP 5 — A/B variant table                                         */}
       {/* ------------------------------------------------------------------ */}
       <section>
-        <h2 className="text-lg font-semibold mb-3" style={{ color: '#E8E0D0' }}>A/B Variant Results</h2>
-        <div className="rounded-xl overflow-hidden" style={{ border: '1px solid #E8E0D0' }}>
+        <h2 className="text-lg font-semibold mb-3" style={{ color: '#e2e8f0' }}>A/B Variant Results</h2>
+        <div className="rounded-xl overflow-hidden" style={{ border: '1px solid #252525' }}>
           <table className="w-full text-sm">
-            <thead style={{ background: '#0A0A0F' }}>
+            <thead style={{ background: '#0D0D0D' }}>
               <tr>
                 {['Variant', 'Trade', 'Sends', 'Reply Rate', 'YES Rate', 'Sample Status'].map((h) => (
                   <th
                     key={h}
                     className="px-4 py-3 text-left font-medium"
-                    style={{ color: '#E8E0D0', borderBottom: '1px solid #E8E0D0' }}
+                    style={{ color: '#e2e8f0', borderBottom: '1px solid #252525' }}
                   >
                     {h}
                   </th>
                 ))}
                 <th
                   className="px-4 py-3 text-left font-medium"
-                  style={{ color: '#E8E0D0', borderBottom: '1px solid #E8E0D0' }}
+                  style={{ color: '#e2e8f0', borderBottom: '1px solid #252525' }}
                 >
                   Actions
                 </th>
@@ -291,7 +291,7 @@ export default function KPIPage() {
             <tbody>
               {splits.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-6 text-center" style={{ color: '#E8E0D0', opacity: 0.5, background: '#1A1A2E' }}>
+                  <td colSpan={7} className="px-4 py-6 text-center" style={{ color: '#e2e8f0', opacity: 0.5, background: '#141414' }}>
                     No variant data yet.
                   </td>
                 </tr>
@@ -306,8 +306,8 @@ export default function KPIPage() {
                     <tr
                       key={idx}
                       style={{
-                        background: '#1A1A2E',
-                        borderBottom: '1px solid #E8E0D0',
+                        background: '#141414',
+                        borderBottom: '1px solid #252525',
                         opacity: isInsufficient ? 0.5 : 1,
                         borderLeft: isBest ? '3px solid #DC143C' : '3px solid transparent',
                       }}
@@ -317,7 +317,7 @@ export default function KPIPage() {
                       <td className="px-4 py-3 text-white">{row.sends}</td>
                       <td className="px-4 py-3 text-white">{fmt(row.reply_rate)}</td>
                       <td className="px-4 py-3 text-white">{fmt(row.yes_rate)}</td>
-                      <td className="px-4 py-3" style={{ color: isInsufficient ? '#9ca3af' : '#E8E0D0' }}>
+                      <td className="px-4 py-3" style={{ color: isInsufficient ? '#9ca3af' : '#252525' }}>
                         {isInsufficient ? 'Insufficient Data' : 'Sufficient'}
                       </td>
                       <td className="px-4 py-3">
@@ -336,23 +336,23 @@ export default function KPIPage() {
       {/* STEP 6 — Sequence funnel                                           */}
       {/* ------------------------------------------------------------------ */}
       <section>
-        <h2 className="text-lg font-semibold mb-3" style={{ color: '#E8E0D0' }}>Sequence Funnel</h2>
-        <div className="rounded-xl p-4 space-y-4" style={{ background: '#1A1A2E', border: '1px solid #E8E0D0' }}>
+        <h2 className="text-lg font-semibold mb-3" style={{ color: '#e2e8f0' }}>Sequence Funnel</h2>
+        <div className="rounded-xl p-4 space-y-4" style={{ background: '#141414', border: '1px solid #252525' }}>
           {funnelData.length === 0 ? (
-            <div className="text-center py-4" style={{ color: '#E8E0D0', opacity: 0.5 }}>No funnel data yet.</div>
+            <div className="text-center py-4" style={{ color: '#e2e8f0', opacity: 0.5 }}>No funnel data yet.</div>
           ) : (
             funnelData.map((step) => {
               const barWidth = step.entered > 0 ? (step.responded / step.entered) * 100 : 0;
               return (
                 <div key={step.touch} className="flex items-center gap-4">
-                  <div className="w-16 text-sm font-medium flex-shrink-0" style={{ color: '#E8E0D0' }}>
+                  <div className="w-16 text-sm font-medium flex-shrink-0" style={{ color: '#e2e8f0' }}>
                     Touch {step.touch}
                   </div>
                   <div className="flex-1 flex flex-col gap-1">
-                    <div className="text-xs" style={{ color: '#E8E0D0', opacity: 0.7 }}>
+                    <div className="text-xs" style={{ color: '#e2e8f0', opacity: 0.7 }}>
                       Entered: {step.entered} | Responded: {step.responded} | Dropped: {step.dropped}
                     </div>
-                    <div className="h-4 rounded-full overflow-hidden" style={{ background: '#2A2A3E' }}>
+                    <div className="h-4 rounded-full overflow-hidden" style={{ background: '#252525' }}>
                       <div
                         className="h-full rounded-full transition-all"
                         style={{ width: `${barWidth}%`, background: '#DC143C' }}
@@ -370,17 +370,17 @@ export default function KPIPage() {
       {/* STEP 7 — Weekly digest log                                         */}
       {/* ------------------------------------------------------------------ */}
       <section>
-        <h2 className="text-lg font-semibold mb-3" style={{ color: '#E8E0D0' }}>Weekly Digest Log</h2>
+        <h2 className="text-lg font-semibold mb-3" style={{ color: '#e2e8f0' }}>Weekly Digest Log</h2>
         <div
           className="rounded-xl overflow-y-auto"
-          style={{ maxHeight: '24rem', border: '1px solid #E8E0D0', background: '#1A1A2E' }}
+          style={{ maxHeight: '24rem', border: '1px solid #252525', background: '#141414' }}
         >
           {digests.length === 0 ? (
-            <div className="px-6 py-8 text-center" style={{ color: '#E8E0D0', opacity: 0.5 }}>
+            <div className="px-6 py-8 text-center" style={{ color: '#e2e8f0', opacity: 0.5 }}>
               No weekly digests yet.
             </div>
           ) : (
-            <ul className="divide-y" style={{ borderColor: '#E8E0D0' }}>
+            <ul className="divide-y" style={{ borderColor: '#252525' }}>
               {digests.map((entry) => (
                 <li key={entry.id} className="px-6 py-5">
                   <div className="flex items-center justify-between mb-2">
@@ -393,14 +393,14 @@ export default function KPIPage() {
                       const v = entry.metrics?.[cfg.key] ?? 0;
                       return (
                         <div key={cfg.key} className="text-xs">
-                          <span style={{ color: '#E8E0D0', opacity: 0.6 }}>{cfg.label}: </span>
+                          <span style={{ color: '#e2e8f0', opacity: 0.6 }}>{cfg.label}: </span>
                           <span className="text-white font-medium">{fmt(v)}</span>
                         </div>
                       );
                     })}
                   </div>
                   {entry.recommendation && (
-                    <p className="text-sm italic" style={{ color: '#E8E0D0' }}>
+                    <p className="text-sm italic" style={{ color: '#e2e8f0' }}>
                       {entry.recommendation}
                     </p>
                   )}

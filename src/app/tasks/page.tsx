@@ -47,11 +47,11 @@ export default function TasksPage() {
     <div className="space-y-6 animate-fade-in">
       <h1 className="text-xl font-semibold">Tasks (from Notion)</h1>
 
-      <div className="bg-gradient-to-r from-[#1A1A2E] to-[#2A2A3E] rounded-xl p-6">
+      <div className="bg-gradient-to-r from-[#141414] to-[#1A1A1A] rounded-xl p-6">
         <h2 className="text-lg font-medium mb-4">Daily Report</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="text-center">
-            <div className="text-3xl font-bold text-[#22d3ee]">{activeTasks.length}</div>
+            <div className="text-3xl font-bold text-[#DC2626]">{activeTasks.length}</div>
             <div className="text-sm text-gray-400">Active</div>
           </div>
           <div className="text-center">
@@ -86,9 +86,9 @@ export default function TasksPage() {
             key={f}
             onClick={() => setFilter(f)}
             className={`px-3 py-1.5 rounded-lg text-sm transition ${
-              filter === f 
-                ? 'bg-[#22d3ee] text-black' 
-                : 'bg-[#1A1A2E] text-gray-400 hover:text-white'
+              filter === f
+                ? 'bg-[#DC2626] text-white'
+                : 'bg-[#141414] text-gray-400 hover:text-white'
             }`}
           >
             {f === 'all' ? 'All' : f}
@@ -105,11 +105,11 @@ export default function TasksPage() {
       ) : (
         <div className="space-y-2">
           {filteredTasks.map((task) => (
-            <div key={task.id} className="bg-[#1A1A2E] rounded-lg p-4 flex items-center justify-between">
+            <div key={task.id} className="bg-[#141414] rounded-lg p-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className={`w-2 h-2 rounded-full ${
                   task.status.toLowerCase() === 'done' ? 'bg-green-500' :
-                  task.status.toLowerCase() === 'in progress' ? 'bg-[#22d3ee]' :
+                  task.status.toLowerCase() === 'in progress' ? 'bg-[#DC2626]' :
                   'bg-gray-500'
                 }`} />
                 <div>

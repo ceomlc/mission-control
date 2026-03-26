@@ -15,7 +15,7 @@ export async function POST(request: Request) {
       // Discard specific outreach IDs
       result = await pool.query(
         `UPDATE vending_outreach
-         SET status = 'discarded', updated_at = NOW()
+         SET status = 'rejected', updated_at = NOW()
          WHERE id = ANY($1::uuid[])
          RETURNING id`,
         [ids]
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
       // Discard ALL drafts where the linked lead has no email
       result = await pool.query(
         `UPDATE vending_outreach o
-         SET status = 'discarded', updated_at = NOW()
+         SET status = 'rejected', updated_at = NOW()
          FROM vending_leads l
          WHERE o.lead_id = l.id
            AND o.status::text IN ('draft', 'pending_approval')

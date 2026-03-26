@@ -21,7 +21,7 @@ export default function VendingLayout({ children }: { children: React.ReactNode 
     async function fetchCounts() {
       try {
         const [emailRes, phoneRes] = await Promise.all([
-          fetch('/api/vending/outreach?status=draft'),
+          fetch('/api/vending/outreach?status=draft,pending_approval'),
           fetch('/api/vending/phone-leads'),
         ]);
         const emailData = await emailRes.json();
@@ -33,6 +33,10 @@ export default function VendingLayout({ children }: { children: React.ReactNode 
       }
     }
     fetchCounts();
+
+    // Re-fetch whenever the outreach page sends or discards an item
+    window.addEventListener('vending-outreach-updated', fetchCounts);
+    return () => window.removeEventListener('vending-outreach-updated', fetchCounts);
   }, []);
 
   return (

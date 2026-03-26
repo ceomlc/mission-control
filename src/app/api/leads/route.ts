@@ -6,22 +6,26 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const status = searchParams.get('status');
   const limit = searchParams.get('limit') || '500';
-  
+  const sort = searchParams.get('sort');
+  const orderClause = sort === 'priority'
+    ? 'ORDER BY l.priority_score DESC NULLS LAST'
+    : 'ORDER BY l.created_at DESC';
+
   try {
     let query: string;
     let params: any[];
-    
+
     if (status) {
-      query = `SELECT l.*, fn.first_name 
-               FROM leads l 
-               LEFT JOIN lead_first_names fn ON l.id = fn.lead_id 
-               WHERE l.status = $1 ORDER BY l.created_at DESC LIMIT $2`;
+      query = `SELECT l.*, fn.first_name
+               FROM leads l
+               LEFT JOIN lead_first_names fn ON l.id = fn.lead_id
+               WHERE l.status = $1 ${orderClause} LIMIT $2`;
       params = [status, limit];
     } else {
-      query = `SELECT l.*, fn.first_name 
-               FROM leads l 
-               LEFT JOIN lead_first_names fn ON l.id = fn.lead_id 
-               ORDER BY l.created_at DESC LIMIT $1`;
+      query = `SELECT l.*, fn.first_name
+               FROM leads l
+               LEFT JOIN lead_first_names fn ON l.id = fn.lead_id
+               ${orderClause} LIMIT $1`;
       params = [limit];
     }
     
